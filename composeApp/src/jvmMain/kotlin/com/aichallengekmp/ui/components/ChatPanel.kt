@@ -1,0 +1,369 @@
+package com.aichallengekmp.ui.components
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.aichallengekmp.models.*
+import com.aichallengekmp.ui.ErrorState
+import kotlinx.coroutines.launch
+
+/**
+ * Правая панель с чатом
+ */
+@Composable
+fun ChatPanel(
+    session: SessionDetailResponse?,
+    pendingMessage: String,
+    defaultSettings: SessionSettingsDto,
+    availableModels: List<ModelInfoDto>,
+    showDefaultSettings: Boolean,
+    isSending: Boolean,
+    error: ErrorState?,
+    onMessageChange: (String) -> Unit,
+    onSendClick: () -> Unit,
+    onCancelClick: () -> Unit,
+    onToggleDefaultSettings: (Boolean) -> Unit,
+    onDefaultSettingsChange: (SessionSettingsDto) -> Unit,
+    onClearError: () -> Unit,
+    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        if (session != null) {
+            // Есть выбранная сессия - показываем чат
+            ChatContent(
+                session = session,
+                pendingMessage = pendingMessage,
+                isSending = isSending,
+                error = error,
+                onMessageChange = onMessageChange,
+                onSendClick = onSendClick,
+                onCancelClick = onCancelClick,
+                onClearError = onClearError,
+                onSettingsClick = onSettingsClick
+            )
+        } else {
+            // Нет выбранной сессии - показываем placeholder
+            EmptyState(
+                pendingMessage = pendingMessage,
+                defaultSettings = defaultSettings,
+                availableModels = availableModels,
+                showSettings = showDefaultSettings,
+                isSending = isSending,
+                error = error,
+                onMessageChange = onMessageChange,
+                onSendClick = onSendClick,
+                onCancelClick = onCancelClick,
+                onToggleSettings = onToggleDefaultSettings,
+                onSettingsChange = onDefaultSettingsChange,
+                onClearError = onClearError
+            )
+        }
+    }
+}
+
+/**
+ * Контент чата (когда сессия выбрана)
+ */
+@Composable
+private fun ChatContent(
+    session: SessionDetailResponse,
+    pendingMessage: String,
+    isSending: Boolean,
+    error: ErrorState?,
+    onMessageChange: (String) -> Unit,
+    onSendClick: () -> Unit,
+    onCancelClick: () -> Unit,
+    onClearError: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Заголовок с названием сессии и кнопкой настроек
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = session.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                // Информация о сжатии если есть
+                session.compressionInfo?.let { compression ->
+                    if (compression.hasSummary) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "📦 ${compression.compressedMessagesCount} сообщений сжато, сэкономлено ${compression.tokensSaved} токенов",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+            }
+            
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Настройки сессии"
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Список сообщений
+        MessageList(
+            messages = session.messages,
+            modifier = Modifier.weight(1f)
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Ошибка если есть
+        error?.let {
+            ErrorCard(
+                error = it,
+                onDismiss = onClearError,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        // Поле ввода
+        MessageInput(
+            message = pendingMessage,
+            isSending = isSending,
+            onMessageChange = onMessageChange,
+            onSendClick = onSendClick,
+            onCancelClick = onCancelClick
+        )
+    }
+}
+
+/**
+ * Пустое состояние (когда сессия не выбрана)
+ */
+@Composable
+private fun EmptyState(
+    pendingMessage: String,
+    defaultSettings: SessionSettingsDto,
+    availableModels: List<ModelInfoDto>,
+    showSettings: Boolean,
+    isSending: Boolean,
+    error: ErrorState?,
+    onMessageChange: (String) -> Unit,
+    onSendClick: () -> Unit,
+    onCancelClick: () -> Unit,
+    onToggleSettings: (Boolean) -> Unit,
+    onSettingsChange: (SessionSettingsDto) -> Unit,
+    onClearError: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Приветствие
+        Icon(
+            imageVector = Icons.Default.ChatBubbleOutline,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Начните новый диалог",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "Введите сообщение ниже, чтобы создать новый чат",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Ошибка если есть
+        error?.let {
+            ErrorCard(
+                error = it,
+                onDismiss = onClearError,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        // Раскрывающаяся панель настроек
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Заголовок с кнопкой раскрытия
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Настройки по умолчанию",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    IconButton(onClick = { onToggleSettings(!showSettings) }) {
+                        Icon(
+                            imageVector = if (showSettings) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (showSettings) "Скрыть" else "Показать"
+                        )
+                    }
+                }
+                
+                // Настройки
+                AnimatedVisibility(visible = showSettings) {
+                    DefaultSettingsPanel(
+                        settings = defaultSettings,
+                        availableModels = availableModels,
+                        onSettingsChange = onSettingsChange
+                    )
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Поле ввода
+        MessageInput(
+            message = pendingMessage,
+            isSending = isSending,
+            onMessageChange = onMessageChange,
+            onSendClick = onSendClick,
+            onCancelClick = onCancelClick
+        )
+    }
+}
+
+/**
+ * Список сообщений
+ */
+@Composable
+private fun MessageList(
+    messages: List<MessageDto>,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Автоскролл к последнему сообщению
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            coroutineScope.launch {
+                listState.animateScrollToItem(messages.size - 1)
+            }
+        }
+    }
+    
+    LazyColumn(
+        modifier = modifier,
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(messages, key = { it.id }) { message ->
+            MessageCard(message = message)
+        }
+    }
+}
+
+/**
+ * Поле ввода сообщения
+ */
+@Composable
+private fun MessageInput(
+    message: String,
+    isSending: Boolean,
+    onMessageChange: (String) -> Unit,
+    onSendClick: () -> Unit,
+    onCancelClick: () -> Unit
+) {
+    Column {
+        OutlinedTextField(
+            value = message,
+            onValueChange = onMessageChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 100.dp, max = 200.dp),
+            placeholder = { Text("Введите сообщение...") },
+            enabled = !isSending,
+            maxLines = 6
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isSending) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Модель думает...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(onClick = onCancelClick) {
+                    Text("Прервать")
+                }
+            } else {
+                Button(
+                    onClick = onSendClick,
+                    enabled = message.trim().isNotEmpty()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Отправить")
+                    }
+                }
+            }
+        }
+    }
+}

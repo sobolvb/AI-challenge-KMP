@@ -1,0 +1,45 @@
+-- Таблица сообщений
+CREATE TABLE Message (
+    id TEXT PRIMARY KEY NOT NULL,
+    sessionId TEXT NOT NULL,
+    role TEXT NOT NULL, -- 'user' or 'assistant'
+    content TEXT NOT NULL,
+    modelId TEXT, -- ID модели, которая сгенерировала ответ (null для user messages)
+    inputTokens INTEGER NOT NULL DEFAULT 0,
+    outputTokens INTEGER NOT NULL DEFAULT 0,
+    createdAt INTEGER NOT NULL,
+    FOREIGN KEY (sessionId) REFERENCES Session(id) ON DELETE CASCADE
+);
+
+-- Индексы
+CREATE INDEX message_sessionId ON Message(sessionId);
+CREATE INDEX message_createdAt ON Message(createdAt);
+
+-- Queries
+selectBySessionId:
+SELECT * FROM Message WHERE sessionId = ? ORDER BY createdAt ASC;
+
+selectBySessionIdPaginated:
+SELECT * FROM Message WHERE sessionId = ? ORDER BY createdAt ASC LIMIT ? OFFSET ?;
+
+-- TODO: Добавить поддержку пагинации в будущем
+countBySessionId:
+SELECT COUNT(*) FROM Message WHERE sessionId = ?;
+
+insert:
+INSERT INTO Message(id, sessionId, role, content, modelId, inputTokens, outputTokens, createdAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteBySessionId:
+DELETE FROM Message WHERE sessionId = ?;
+
+getLastMessage:
+SELECT * FROM Message WHERE sessionId = ? ORDER BY createdAt DESC LIMIT 1;
+
+getTotalTokensBySessionId:
+SELECT
+    COALESCE(SUM(inputTokens), 0) AS totalInput,
+    COALESCE(SUM(outputTokens), 0) AS totalOutput,
+    COALESCE(SUM(inputTokens) + SUM(outputTokens), 0) AS total
+FROM Message
+WHERE sessionId = ?;

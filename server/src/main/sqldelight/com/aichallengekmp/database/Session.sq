@@ -1,0 +1,33 @@
+-- Таблица сессий (чатов)
+CREATE TABLE Session (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+-- Индексы для оптимизации
+CREATE INDEX session_updatedAt ON Session(updatedAt DESC);
+
+-- Queries
+selectAll:
+SELECT * FROM Session ORDER BY updatedAt DESC;
+
+selectById:
+SELECT * FROM Session WHERE id = ?;
+
+insert:
+INSERT INTO Session(id, name, createdAt, updatedAt)
+VALUES (?, ?, ?, ?);
+
+updateName:
+UPDATE Session SET name = ?, updatedAt = ? WHERE id = ?;
+
+updateTimestamp:
+UPDATE Session SET updatedAt = ? WHERE id = ?;
+
+delete:
+DELETE FROM Session WHERE id = ?;
+
+count:
+SELECT COUNT(*) FROM Session;

@@ -1,0 +1,24 @@
+-- Таблица для хранения информации о сжатии истории
+CREATE TABLE SessionCompression (
+    sessionId TEXT PRIMARY KEY NOT NULL,
+    summary TEXT NOT NULL, -- Саммари сжатой части диалога
+    lastCompressionIndex INTEGER NOT NULL DEFAULT 0, -- Индекс последнего сжатого сообщения
+    compressedAt INTEGER NOT NULL, -- Временная метка последнего сжатия
+    FOREIGN KEY (sessionId) REFERENCES Session(id) ON DELETE CASCADE
+);
+
+-- Queries
+selectBySessionId:
+SELECT * FROM SessionCompression WHERE sessionId = ?;
+
+insert:
+INSERT INTO SessionCompression(sessionId, summary, lastCompressionIndex, compressedAt)
+VALUES (?, ?, ?, ?);
+
+update:
+UPDATE SessionCompression 
+SET summary = ?, lastCompressionIndex = ?, compressedAt = ?
+WHERE sessionId = ?;
+
+delete:
+DELETE FROM SessionCompression WHERE sessionId = ?;

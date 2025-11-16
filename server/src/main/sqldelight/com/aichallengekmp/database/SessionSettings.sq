@@ -1,0 +1,26 @@
+-- Таблица настроек сессии
+CREATE TABLE SessionSettings (
+    sessionId TEXT PRIMARY KEY NOT NULL,
+    modelId TEXT NOT NULL,
+    temperature REAL NOT NULL DEFAULT 0.6,
+    maxTokens INTEGER NOT NULL DEFAULT 2000,
+    compressionThreshold INTEGER NOT NULL DEFAULT 20,
+    systemPrompt TEXT,
+    FOREIGN KEY (sessionId) REFERENCES Session(id) ON DELETE CASCADE
+);
+
+-- Queries
+selectBySessionId:
+SELECT * FROM SessionSettings WHERE sessionId = ?;
+
+insert:
+INSERT INTO SessionSettings(sessionId, modelId, temperature, maxTokens, compressionThreshold, systemPrompt)
+VALUES (?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE SessionSettings 
+SET modelId = ?, temperature = ?, maxTokens = ?, compressionThreshold = ?, systemPrompt = ?
+WHERE sessionId = ?;
+
+delete:
+DELETE FROM SessionSettings WHERE sessionId = ?;

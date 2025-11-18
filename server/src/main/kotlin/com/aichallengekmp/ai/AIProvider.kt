@@ -1,5 +1,7 @@
 package com.aichallengekmp.ai
 
+import com.aichallengekmp.tools.ToolDefinition
+
 /**
  * Абстрактный интерфейс для AI провайдеров
  * Позволяет легко добавлять новые модели от разных провайдеров
@@ -41,15 +43,18 @@ data class CompletionRequest(
     val messages: List<AIMessage>,
     val temperature: Double = 0.6,
     val maxTokens: Int = 2000,
-    val systemPrompt: String? = null
+    val systemPrompt: String? = null,
+    val tools: List<ToolDefinition>? = null
 )
 
 /**
  * Сообщение для AI
  */
 data class AIMessage(
-    val role: String, // "user", "assistant", "system"
-    val content: String
+    val role: String, // "user", "assistant", "system", "function"
+    val content: String? = null,
+    val toolCallList: Any? = null,  // Для YandexGPT function calling
+    val toolResultList: Any? = null  // Для YandexGPT function calling
 )
 
 /**

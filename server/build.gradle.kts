@@ -39,19 +39,22 @@ dependencies {
 
     // Ktor Client
     implementation(libs.ktor.client.content.negotiation)
-    implementation("io.ktor:ktor-client-cio:2.3.8")
+    implementation(libs.ktor.client)
+    implementation(libs.ktor.client.logging)
 
     // SQLDelight
     implementation(libs.sqldelight.driver.sqlite)
     implementation(libs.sqldelight.coroutines)
     implementation(libs.runtime)
 
-    // Koin
-    implementation(libs.koin.core)
-    implementation(libs.koin.ktor)
-    implementation(libs.koin.logger.slf4j)
+    // Koin - УДАЛЕН из-за несовместимости с Ktor 3.x
+    // Используем manual DI вместо Koin
 
     // Tests
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
+
+    // MCP SDK - теперь работает, т.к. убрали Koin!
+    implementation("io.modelcontextprotocol:kotlin-sdk-server:0.7.7")
+    implementation("io.modelcontextprotocol:kotlin-sdk:0.7.7")
 }

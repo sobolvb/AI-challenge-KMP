@@ -1,14 +1,13 @@
 package com.aichallengekmp.routing
 
+import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.models.*
-import com.aichallengekmp.service.ChatService
 import com.aichallengekmp.service.NotFoundException
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.koin.ktor.ext.inject
 import org.slf4j.LoggerFactory
 
 /**
@@ -16,7 +15,7 @@ import org.slf4j.LoggerFactory
  */
 fun Route.chatRoutes() {
     val logger = LoggerFactory.getLogger("ChatRoutes")
-    val chatService by inject<ChatService>()
+    val chatService = AppContainer.chatService
 
     // ============= Sessions =============
 

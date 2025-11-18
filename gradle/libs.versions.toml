@@ -3,14 +3,16 @@ androidx-lifecycle = "2.8.2"
 composeHotReload = "1.0.0-rc02"
 composeMultiplatform = "1.7.1"
 junit = "4.13.2"
-koin = "4.0.1"
+koin = "4.0.0"
 kotlin = "2.2.20"
 kotlinx-coroutines = "1.10.2"
-ktor = "2.3.10"
+ktor = "3.0.3"
 logback = "1.5.20"
 sqlDelight = "2.1.0"
+mcpVersion = "0.7.7"
 [libraries]
 
+mcp-kotlin = {module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcpVersion"}
 ktor-client-logging = {module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }

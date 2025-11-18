@@ -1,7 +1,8 @@
 package com.aichallengekmp
 
-import com.aichallengekmp.di.appModule
+import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.routing.chatRoutes
+import com.aichallengekmp.mcp.configureMcpServer
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -9,10 +10,9 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.sse.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import org.koin.ktor.plugin.Koin
-import org.koin.logger.slf4jLogger
 import org.slf4j.LoggerFactory
 
 @ExperimentalSerializationApi
@@ -21,11 +21,8 @@ fun Application.module() {
 
     logger.info("🚀 Запуск AI Challenge KMP Server")
 
-    // Koin DI
-    install(Koin) {
-        slf4jLogger()
-        modules(appModule)
-    }
+    // Инициализируем DI container
+    AppContainer.chatService
 
     // Content Negotiation
     install(ContentNegotiation) {
@@ -36,8 +33,14 @@ fun Application.module() {
             explicitNulls = false
         })
     }
+    
+    // SSE для MCP
+    install(SSE)
+    
+    // MCP Server для Яндекс.Трекер
+    configureMcpServer(AppContainer.trackerTools)
 
-    // Routing
+    // Routing (без дублирования ContentNegotiation)
     routing {
         // Health check endpoint
         get("/health") {
@@ -62,9 +65,10 @@ fun main() {
     logger.info("🌟 AI Challenge KMP - Starting...")
 
     embeddedServer(
-        Netty,
+        factory = Netty,
         port = 8080,
-        host = "0.0.0.0",
-        module = Application::module
-    ).start(wait = true)
+        host = "0.0.0.0"
+    ) {
+        module()
+    }.start(wait = true)
 }

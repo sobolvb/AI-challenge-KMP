@@ -6,6 +6,7 @@ import com.aichallengekmp.database.Session
 import com.aichallengekmp.database.SessionSettings
 import com.aichallengekmp.database.dao.*
 import com.aichallengekmp.models.*
+import com.aichallengekmp.tools.TrackerToolsService
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
@@ -18,7 +19,8 @@ class ChatService(
     private val messageDao: MessageDao,
     private val settingsDao: SessionSettingsDao,
     private val compressionService: CompressionService,
-    private val modelRegistry: ModelRegistry
+    private val modelRegistry: ModelRegistry,
+    private val trackerTools: TrackerToolsService
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
     
@@ -62,8 +64,8 @@ class ChatService(
         )
         messageDao.insert(userMessage)
         
-        // Получаем ответ от AI
-        val aiResponse = generateResponse(sessionId, settings, listOf(userMessage))
+        // Получаем ответ от AI (с поддержкой инструментов)
+        val aiResponse = generateResponseWithTools(sessionId, settings, listOf(userMessage))
         
         // Добавляем ответ AI
         val assistantMessage = Message(
@@ -127,8 +129,8 @@ class ChatService(
         // Получаем контекст для AI (с учетом сжатия)
         val contextMessages = compressionService.getContextForAI(sessionId)
         
-        // Получаем ответ от AI
-        val aiResponse = generateResponse(sessionId, settings.toDto(), contextMessages)
+        // Получаем ответ от AI (с поддержкой инструментов)
+        val aiResponse = generateResponseWithTools(sessionId, settings.toDto(), contextMessages)
         
         // Добавляем ответ AI
         val assistantMessage = Message(
@@ -253,25 +255,30 @@ class ChatService(
     // ============= Private Helper Methods =============
     
     /**
-     * Генерация ответа от AI
+     * Генерация ответа от AI с поддержкой инструментов (через function calling)
      */
-    private suspend fun generateResponse(
+    private suspend fun generateResponseWithTools(
         sessionId: String,
         settings: SessionSettingsDto,
         messages: List<Message>
     ): CompletionResult {
-        logger.debug("🤖 Генерация ответа AI для сессии: $sessionId")
+        logger.debug("🤖 Генерация ответа AI с инструментами для сессии: $sessionId")
         
         val aiMessages = messages.map { msg ->
             AIMessage(role = msg.role, content = msg.content)
         }
+        
+        // Получаем доступные инструменты
+        val availableTools = trackerTools.getAvailableTools()
+        logger.info("🔧 Передаем YandexGPT ${availableTools.size} инструментов")
         
         val request = CompletionRequest(
             modelId = settings.modelId,
             messages = aiMessages,
             temperature = settings.temperature,
             maxTokens = settings.maxTokens,
-            systemPrompt = settings.systemPrompt
+            systemPrompt = settings.systemPrompt,
+            tools = availableTools  // YandexGPT сам решит какие вызвать!
         )
         
         return modelRegistry.complete(request)

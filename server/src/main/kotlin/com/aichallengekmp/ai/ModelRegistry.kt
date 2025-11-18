@@ -43,6 +43,13 @@ class ModelRegistry {
     }
     
     /**
+     * Получить провайдер по ID
+     */
+    fun getProvider(providerId: String): AIProvider? {
+        return providers[providerId]
+    }
+    
+    /**
      * Отправить запрос на генерацию
      */
     suspend fun complete(request: CompletionRequest): CompletionResult {

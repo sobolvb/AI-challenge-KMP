@@ -14,7 +14,8 @@ kotlin {
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx)
                 implementation(libs.ktor.client.logging)
-
+                // MCP SDK только для JVM (server модуль)
+                // implementation(libs.mcp.kotlin)
             }
         }
 

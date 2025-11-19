@@ -1,0 +1,28 @@
+CREATE TABLE Reminder (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    message TEXT NOT NULL,
+    -- Храним время напоминания как millis since epoch (TIMESTAMP логически)
+    remindAt INTEGER NOT NULL
+);
+
+selectAllReminders:
+SELECT * FROM Reminder
+ORDER BY remindAt ASC;
+
+selectReminderById:
+SELECT * FROM Reminder
+WHERE id = ?;
+
+insertReminder:
+INSERT INTO Reminder(message, remindAt)
+VALUES (?, ?);
+
+deleteReminderById:
+DELETE FROM Reminder
+WHERE id = ?;
+
+-- Напоминания, которые пора отдать пользователю (remindAt <= :now)
+selectDueReminders:
+SELECT * FROM Reminder
+WHERE remindAt <= ?
+ORDER BY remindAt ASC;

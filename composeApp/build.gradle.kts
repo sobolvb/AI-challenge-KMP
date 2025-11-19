@@ -36,6 +36,8 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            // Логирование для desktop-клиента (SLF4J + Logback)
+            implementation(libs.logback)
         }
     }
 }

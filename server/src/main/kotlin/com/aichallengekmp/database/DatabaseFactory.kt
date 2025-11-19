@@ -31,6 +31,29 @@ object DatabaseFactory {
             
             if (currentVersion < schemaVersion) {
                 logger.info("🔄 Миграция с версии $currentVersion на $schemaVersion")
+                // TODO: когда появятся полноценные миграции SQLDelight (.sqm), заменить на Schema.migrate
+                // Временная миграция: создаём таблицу Reminder, если её ещё нет, и обновляем user_version
+                try {
+                    driver.execute(
+                        identifier = null,
+                        sql = """
+                            CREATE TABLE IF NOT EXISTS Reminder (
+                                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                                message TEXT NOT NULL,
+                                remindAt INTEGER NOT NULL
+                            );
+                        """.trimIndent(),
+                        parameters = 0
+                    )
+                    driver.execute(
+                        identifier = null,
+                        sql = "PRAGMA user_version = $schemaVersion",
+                        parameters = 0
+                    )
+                    logger.info("✅ Временная миграция: таблица Reminder создана (если отсутствовала), user_version обновлён до $schemaVersion")
+                } catch (e: Exception) {
+                    logger.error("❌ Ошибка временной миграции для таблицы Reminder: ${e.message}", e)
+                }
                 // AppDatabase.Schema.migrate(driver, currentVersion, schemaVersion)
             }
         }

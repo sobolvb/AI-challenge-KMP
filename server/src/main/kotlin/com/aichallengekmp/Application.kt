@@ -3,6 +3,8 @@ package com.aichallengekmp
 import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.routing.chatRoutes
 import com.aichallengekmp.mcp.configureMcpServer
+import com.aichallengekmp.scheduler.ReminderScheduler
+import com.aichallengekmp.scheduler.ReminderNotifications
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -11,6 +13,8 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
+import io.ktor.sse.ServerSentEvent
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -23,6 +27,7 @@ fun Application.module() {
 
     // Инициализируем DI container
     AppContainer.chatService
+    AppContainer.reminderService
 
     // Content Negotiation
     install(ContentNegotiation) {
@@ -37,8 +42,44 @@ fun Application.module() {
     // SSE для MCP
     install(SSE)
     
-    // MCP Server для Яндекс.Трекер
-    configureMcpServer(AppContainer.trackerTools)
+    // MCP Server для Яндекс.Трекер + напоминания
+    val mcpServer = configureMcpServer(
+        trackerTools = AppContainer.trackerTools,
+        reminderService = AppContainer.reminderService
+    )
+
+    // Фоновый планировщик напоминаний, работает 24/7 после старта сервера
+    ReminderScheduler(
+        reminderService = AppContainer.reminderService,
+        intervalMinutes = 1L // можно вынести в конфиг/ENV
+    ) { summary ->
+        // Рассылаем всем подписанным клиентам по SSE
+        ReminderNotifications.broadcast(summary)
+
+        // ⚠️ ВРЕМЕННЫЙ УПРОЩЁННЫЙ ВАРИАНТ: продублируем напоминание в последнюю активную сессию,
+        // чтобы клиент точно увидел его как новое сообщение без SSE.
+        try {
+            val sessions = AppContainer.sessionDao.getAll()
+            val lastSession = sessions.maxByOrNull { it.updatedAt }
+            if (lastSession != null) {
+                val now = System.currentTimeMillis()
+                val message = com.aichallengekmp.database.Message(
+                    id = java.util.UUID.randomUUID().toString(),
+                    sessionId = lastSession.id,
+                    role = "assistant",
+                    content = "Сводка напоминаний:\n$summary",
+                    modelId = "reminder-system",
+                    inputTokens = 0,
+                    outputTokens = 0,
+                    createdAt = now
+                )
+                AppContainer.messageDao.insert(message)
+                AppContainer.sessionDao.updateTimestamp(lastSession.id, now)
+            }
+        } catch (e: Exception) {
+            logger.error("❌ Ошибка при записи напоминания в чат: ${e.message}", e)
+        }
+    }.start()
 
     // Routing (без дублирования ContentNegotiation)
     routing {
@@ -54,6 +95,18 @@ fun Application.module() {
         // Chat API routes
         route("/api") {
             chatRoutes()
+
+            // SSE-стрим с напоминаниями для клиента KMP (Ktor 3.x API)
+            sse("/reminders/stream") {
+                val unsubscribe = ReminderNotifications.subscribe { summary ->
+                    send(ServerSentEvent(data = summary))
+                }
+                try {
+                    awaitCancellation() // держим соединение открытым, пока клиент не отключится
+                } finally {
+                    unsubscribe()
+                }
+            }
         }
     }
 

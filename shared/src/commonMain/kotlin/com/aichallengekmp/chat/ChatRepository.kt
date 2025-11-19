@@ -3,8 +3,11 @@ package com.aichallengekmp.chat
 import com.aichallengekmp.models.*
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.utils.io.*
 
 /**
  * Репозиторий для работы с Chat API
@@ -17,6 +20,12 @@ interface ChatRepository {
     suspend fun updateSettings(sessionId: String, settings: SessionSettingsDto): Result<SessionSettingsDto>
     suspend fun deleteSession(sessionId: String): Result<Unit>
     suspend fun getAvailableModels(): Result<List<ModelInfoDto>>
+
+    /**
+     * Подписка на SSE-стрим напоминаний.
+     * Блокирующий вызов: пока соединение открыто, onSummary вызывается при каждом событии.
+     */
+    suspend fun listenReminders(onSummary: (String) -> Unit)
 }
 
 /**
@@ -70,5 +79,42 @@ class KtorChatRepository(
         client.get("$baseUrl/api/models") {
             accept(ContentType.Application.Json)
         }.body()
+    }
+
+    override suspend fun listenReminders(onSummary: (String) -> Unit) {
+        // Простая SSE-реализация поверх text/event-stream
+        val response: HttpResponse = client.get("$baseUrl/api/reminders/stream") {
+            accept(ContentType.Text.EventStream)
+            // Подстрахуемся: явно отключим таймаут для этого запроса
+            timeout {
+                requestTimeoutMillis = Int.MAX_VALUE.toLong()
+            }
+        }
+
+        val channel: ByteReadChannel = response.bodyAsChannel()
+
+        val currentEventLines = mutableListOf<String>()
+
+        while (!channel.isClosedForRead) {
+            val line = channel.readUTF8Line() ?: break
+
+            if (line.startsWith("data:")) {
+                val value = line.removePrefix("data:").trimStart()
+                currentEventLines += value
+            } else if (line.isBlank()) {
+                if (currentEventLines.isNotEmpty()) {
+                    val summary = currentEventLines.joinToString("\n")
+                    onSummary(summary)
+                    currentEventLines.clear()
+                }
+            }
+            // остальные поля SSE (event:, id:) нам пока не нужны
+        }
+
+        // На случай, если соединение оборвалось без пустой строки
+        if (currentEventLines.isNotEmpty()) {
+            val summary = currentEventLines.joinToString("\n")
+            onSummary(summary)
+        }
     }
 }

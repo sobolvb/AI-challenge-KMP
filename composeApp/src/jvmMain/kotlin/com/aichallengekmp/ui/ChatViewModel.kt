@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aichallengekmp.chat.ChatRepository
 import com.aichallengekmp.models.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
@@ -25,6 +27,7 @@ class ChatViewModel(
     init {
         logger.info("🎬 Инициализация ChatViewModel")
         loadInitialData()
+        startReminderListener()
     }
     
     // ============= Public Actions =============
@@ -282,6 +285,50 @@ class ChatViewModel(
     
     // ============= Private Helper Methods =============
     
+    /**
+     * Запускает фоновое прослушивание SSE-стрима напоминаний
+     * и добавляет их как системные сообщения в текущую сессию.
+     */
+    private fun startReminderListener() {
+        viewModelScope.launch {
+            logger.info("⏰ Запуск прослушивания напоминаний через SSE")
+            while (isActive) {
+                try {
+                    repository.listenReminders { summary ->
+                        logger.info("⏰ Получено напоминание через SSE:\n$summary")
+                        _uiState.update { state ->
+                            val currentSession = state.selectedSession
+                            if (currentSession == null) {
+                                // Если сессия не выбрана, просто игнорируем (можно развить до отдельного списка уведомлений)
+                                return@update state
+                            }
+
+                            val reminderMessage = MessageDto(
+                                id = "reminder-${System.currentTimeMillis()}",
+                                role = "assistant",
+                                content = "Сводка напоминаний:\n$summary",
+                                modelId = currentSession.settings.modelId,
+                                modelName = "Напоминания",
+                                tokenUsage = null,
+                                timestamp = System.currentTimeMillis()
+                            )
+
+                            val updatedSession = currentSession.copy(
+                                messages = currentSession.messages + reminderMessage
+                            )
+
+                        state.copy(selectedSession = updatedSession)
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.error("❌ Ошибка при прослушивании напоминаний: ${e.message}", e)
+                    // Подождём немного и попробуем переподключиться к SSE
+                    delay(5_000)
+                }
+            }
+        }
+    }
+
     /**
      * Создать новую сессию с первым сообщением
      */

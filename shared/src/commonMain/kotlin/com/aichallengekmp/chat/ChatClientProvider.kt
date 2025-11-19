@@ -2,6 +2,7 @@ package com.aichallengekmp.chat
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.http.ContentType
@@ -18,6 +19,12 @@ object ChatClientProvider {
 
     private val httpClient: HttpClient by lazy {
         HttpClient(CIO) {
+            // Отключаем таймауты для долгоживущих соединений (SSE)
+            install(HttpTimeout) {
+                // бесконечный таймаут
+                requestTimeoutMillis = Int.MAX_VALUE.toLong()
+            }
+
             install(ContentNegotiation) {
                 register(ContentType.Application.Json, KotlinxSerializationConverter(Json {
                     prettyPrint = true

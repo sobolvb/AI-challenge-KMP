@@ -6,6 +6,7 @@ import com.aichallengekmp.database.DatabaseFactory
 import com.aichallengekmp.database.dao.*
 import com.aichallengekmp.service.ChatService
 import com.aichallengekmp.service.CompressionService
+import com.aichallengekmp.service.ReminderService
 import com.aichallengekmp.tools.TrackerToolsService
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -61,12 +62,13 @@ object AppContainer {
     val messageDao by lazy { MessageDao(database) }
     val sessionSettingsDao by lazy { SessionSettingsDao(database) }
     val compressionDao by lazy { CompressionDao(database) }
+    val reminderDao by lazy { ReminderDao(database) }
     
     // ============= Services =============
     
     val trackerTools by lazy {
         logger.info("🔧 Инициализация TrackerToolsService")
-        TrackerToolsService()
+        TrackerToolsService(reminderService)
     }
     
     // ============= AI Providers =============
@@ -108,6 +110,10 @@ object AppContainer {
             modelRegistry = modelRegistry,
             trackerTools = trackerTools
         )
+    }
+
+    val reminderService by lazy {
+        ReminderService(reminderDao)
     }
 }
 

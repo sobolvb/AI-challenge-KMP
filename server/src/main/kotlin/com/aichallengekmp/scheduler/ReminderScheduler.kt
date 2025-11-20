@@ -35,7 +35,7 @@ class ReminderScheduler(
                 try {
                     tick()
                 } catch (e: Exception) {
-                    logger.error("Ошибка в цикле ReminderScheduler: ${'$'}{e.message}", e)
+                    logger.error("Ошибка в цикле ReminderScheduler: ${e.message}", e)
                 }
                 delay(intervalMinutes * 20000L)
             }

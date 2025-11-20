@@ -24,12 +24,12 @@ class ReminderDao(private val database: AppDatabase) {
     }
 
     suspend fun insert(message: String, remindAtMillis: Long) = withContext(Dispatchers.IO) {
-        logger.info("⏰ Создание напоминания на ${'$'}remindAtMillis: ${'$'}message")
+        logger.info("⏰ Создание напоминания на $remindAtMillis: $message")
         queries.insertReminder(message, remindAtMillis)
     }
 
     suspend fun delete(id: Long) = withContext(Dispatchers.IO) {
-        logger.warn("⏰ Удаление напоминания id=${'$'}id")
+        logger.warn("⏰ Удаление напоминания id=$id")
         queries.deleteReminderById(id)
     }
 

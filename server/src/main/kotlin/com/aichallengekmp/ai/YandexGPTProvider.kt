@@ -91,39 +91,29 @@ class YandexGPTProvider(
 
         logger.debug("📤 Отправка запроса в Yandex API")
 
-        var raw = try {
+        val raw = try {
             httpClient.post(API_URL) {
                 headers {
                     append(HttpHeaders.Authorization, "Api-Key $apiKey")
                     append(HttpHeaders.ContentType, ContentType.Application.Json)
                 }
                 contentType(ContentType.Application.Json)
-//                header("Authorization", "Api-Key $apiKey")
-//                header("x-folder-id", folderId)
                 setBody(requestBody)
             }.bodyAsText()
         } catch (e: Exception) {
             logger.error("❌ Ошибка при вызове Yandex API: ${e.message}", e)
             throw AIProviderException("Ошибка при обращении к YandexGPT: ${e.message}", e)
         }
-        logger.error("RAW YA RESPONSE = $raw")   // <- увидишь точный JSON
+        logger.debug("RAW YA RESPONSE = $raw")
+
         val response = try {
-            httpClient.post(API_URL) {
-                headers {
-                    append(HttpHeaders.Authorization, "Api-Key $apiKey")
-                    append(HttpHeaders.ContentType, ContentType.Application.Json)
-                }
-//                contentType(ContentType.Application.Json)
-//                header("Authorization", "Api-Key $apiKey")
-//                header("x-folder-id", folderId)
-                setBody(requestBody)
-            }.body<YandexCompletionResponse>()
+            val json = Json { ignoreUnknownKeys = true }
+            json.decodeFromString<YandexCompletionResponse>(raw)
         } catch (e: Exception) {
-            logger.error("❌ Ошибка при вызове Yandex API: ${e.message}", e)
-            throw AIProviderException("Ошибка при обращении к YandexGPT: ${e.message}", e)
+            logger.error("❌ Ошибка парсинга ответа Yandex API: ${e.message}", e)
+            throw AIProviderException("Ошибка при разборе ответа YandexGPT: ${e.message}", e)
         }
-        logger.debug("result = {}", response, "result = $response")
-        response as YandexCompletionResponse
+
         val text = response.result.alternatives.firstOrNull()?.message?.text
             ?: throw AIProviderException("Пустой ответ от YandexGPT")
 
@@ -310,7 +300,10 @@ class YandexGPTProvider(
             )
             logger.info("📦 REQUEST = $request")
             logger.info("📦 requestBody = $requestBody")
-            logger.info("Финальный запрос: {}", Json.encodeToString(requestBody))
+            logger.info(
+                "Финальный запрос: {}",
+                Json.encodeToString(YandexCompletionRequest.serializer(), requestBody)
+            )
 
 
             // Сначала получаем RAW ответ
@@ -345,16 +338,18 @@ class YandexGPTProvider(
             val alternative = response.result.alternatives.firstOrNull()
                 ?: throw AIProviderException("Пустой ответ от YandexGPT")
 
-            // Проверяем есть ли вызов функции В MESSAGE!
-            val hasToolCalls =
-                alternative?.message?.toolCallList != null && alternative.message.toolCallList!!.toolCalls.isNotEmpty()
-            logger.info("🔍 Проверка toolCallList: ${alternative?.message?.toolCallList}, hasToolCalls=$hasToolCalls")
+            // Может прийти toolCallList либо на уровне message, либо на уровне alternative
+            val toolCallList = alternative.message.toolCallList ?: alternative.toolCallList
+
+            // Проверяем есть ли вызов функции
+            val hasToolCalls = toolCallList?.toolCalls?.isNotEmpty() == true
+            logger.info("🔍 Проверка toolCallList: ${toolCallList}, hasToolCalls=$hasToolCalls")
 
             if (hasToolCalls) {
-                logger.info("🔧 YandexGPT запросил вызов ${alternative!!.message.toolCallList!!.toolCalls.size} функций")
+                logger.info("🔧 YandexGPT запросил вызов ${toolCallList!!.toolCalls.size} функций")
 
                 // Выполняем все запрошенные функции
-                val toolResults = alternative.message.toolCallList!!.toolCalls.map { toolCall ->
+                val toolResults = toolCallList.toolCalls.map { toolCall ->
                     val functionName = toolCall.functionCall.name
                     val arguments = toolCall.functionCall.arguments
 
@@ -376,7 +371,7 @@ class YandexGPTProvider(
                     AIMessage(
                         role = "assistant",
                         content = null,  // Пустой текст, т.к. есть toolCallList
-                        toolCallList = alternative.message.toolCallList
+                        toolCallList = toolCallList
                     )
                 )
 

@@ -51,34 +51,34 @@ fun Application.module() {
     // Фоновый планировщик напоминаний, работает 24/7 после старта сервера
     ReminderScheduler(
         reminderService = AppContainer.reminderService,
-        intervalMinutes = 1L // можно вынести в конфиг/ENV
+        intervalMinutes = 100L // можно вынести в конфиг/ENV
     ) { summary ->
-        // Рассылаем всем подписанным клиентам по SSE
-        ReminderNotifications.broadcast(summary)
-
-        // ⚠️ ВРЕМЕННЫЙ УПРОЩЁННЫЙ ВАРИАНТ: продублируем напоминание в последнюю активную сессию,
-        // чтобы клиент точно увидел его как новое сообщение без SSE.
-        try {
-            val sessions = AppContainer.sessionDao.getAll()
-            val lastSession = sessions.maxByOrNull { it.updatedAt }
-            if (lastSession != null) {
-                val now = System.currentTimeMillis()
-                val message = com.aichallengekmp.database.Message(
-                    id = java.util.UUID.randomUUID().toString(),
-                    sessionId = lastSession.id,
-                    role = "assistant",
-                    content = "Сводка напоминаний:\n$summary",
-                    modelId = "reminder-system",
-                    inputTokens = 0,
-                    outputTokens = 0,
-                    createdAt = now
-                )
-                AppContainer.messageDao.insert(message)
-                AppContainer.sessionDao.updateTimestamp(lastSession.id, now)
-            }
-        } catch (e: Exception) {
-            logger.error("❌ Ошибка при записи напоминания в чат: ${e.message}", e)
-        }
+//        // Рассылаем всем подписанным клиентам по SSE
+//        ReminderNotifications.broadcast(summary)
+//
+//        // ⚠️ ВРЕМЕННЫЙ УПРОЩЁННЫЙ ВАРИАНТ: продублируем напоминание в последнюю активную сессию,
+//        // чтобы клиент точно увидел его как новое сообщение без SSE.
+//        try {
+//            val sessions = AppContainer.sessionDao.getAll()
+//            val lastSession = sessions.maxByOrNull { it.updatedAt }
+//            if (lastSession != null) {
+//                val now = System.currentTimeMillis()
+//                val message = com.aichallengekmp.database.Message(
+//                    id = java.util.UUID.randomUUID().toString(),
+//                    sessionId = lastSession.id,
+//                    role = "assistant",
+//                    content = "Сводка напоминаний:\n$summary",
+//                    modelId = "reminder-system",
+//                    inputTokens = 0,
+//                    outputTokens = 0,
+//                    createdAt = now
+//                )
+//                AppContainer.messageDao.insert(message)
+//                AppContainer.sessionDao.updateTimestamp(lastSession.id, now)
+//            }
+//        } catch (e: Exception) {
+//            logger.error("❌ Ошибка при записи напоминания в чат: ${e.message}", e)
+//        }
     }.start()
 
     // Routing (без дублирования ContentNegotiation)
@@ -125,3 +125,7 @@ fun main() {
         module()
     }.start(wait = true)
 }
+
+/*
+
+ */

@@ -78,10 +78,16 @@ fun Application.configureMcpServer(
                 },
                 required = listOf("issue_key")
             ),
-            handler = { _ ->
-                // TODO: Получить issue_key из аргументов
-                // Пока используем фиксированный ключ для демонстрации
-                val result = trackerTools.executeTool("get_all_issue_names", emptyMap())
+            handler = { arguments ->
+                val issueKey = arguments.arguments["issue_key"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'issue_key'"))
+                    )
+
+                val result = trackerTools.executeTool(
+                    toolName = "get_issue_info",
+                    arguments = mapOf("issue_key" to issueKey)
+                )
                 CallToolResult(content = listOf(TextContent(result)))
             }
         )
@@ -118,14 +124,14 @@ fun Application.configureMcpServer(
                     odt.toInstant().toEpochMilli()
                 } catch (e: Exception) {
                     return@addTool CallToolResult(
-                        content = listOf(TextContent("Ошибка: не удалось разобрать дату/время remind_at_iso: ${'$'}remindAtIso"))
+                        content = listOf(TextContent("Ошибка: не удалось разобрать дату/время remind_at_iso: $remindAtIso"))
                     )
                 }
 
                 val reminder = reminderService.createReminder(message, remindAtMillis)
                 CallToolResult(
                     content = listOf(
-                        TextContent("Напоминание #${'$'}{reminder.id} создано на время ${'$'}{reminder.remindAt}")
+                        TextContent("Напоминание #${reminder.id} создано на время ${reminder.remindAt}")
                     )
                 )
             }
@@ -144,7 +150,7 @@ fun Application.configureMcpServer(
                     "Напоминаний нет"
                 } else {
                     buildString {
-                        appendLine("Всего напоминаний: ${'$'}{reminders.size}")
+                        appendLine("Всего напоминаний: ${reminders.size}")
                         reminders.forEach { r ->
                             append("- #").append(r.id)
                                 .append(" [").append(r.remindAt).append("] ")
@@ -176,7 +182,7 @@ fun Application.configureMcpServer(
                     )
 
                 reminderService.deleteReminder(id)
-                CallToolResult(content = listOf(TextContent("Напоминание #${'$'}id удалено")))
+                CallToolResult(content = listOf(TextContent("Напоминание #$id удалено")))
             }
         )
 

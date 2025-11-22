@@ -3,6 +3,8 @@ package com.aichallengekmp
 import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.routing.chatRoutes
 import com.aichallengekmp.mcp.configureMcpServer
+import com.aichallengekmp.mcp.configureTrackerMcpServer
+import com.aichallengekmp.mcp.configureRemindersMcpServer
 import com.aichallengekmp.scheduler.ReminderScheduler
 import com.aichallengekmp.scheduler.ReminderNotifications
 import io.ktor.serialization.kotlinx.json.*
@@ -42,9 +44,19 @@ fun Application.module() {
     // SSE для MCP
     install(SSE)
     
-    // MCP Server для Яндекс.Трекер + напоминания
-    val mcpServer = configureMcpServer(
+    // MCP Server для Яндекс.Трекер + напоминания (единый, для обратной совместимости)
+    configureMcpServer(
         trackerTools = AppContainer.trackerTools,
+        reminderService = AppContainer.reminderService
+    )
+
+    // Отдельный MCP сервер только для трекера
+    configureTrackerMcpServer(
+        trackerTools = AppContainer.trackerTools
+    )
+
+    // Отдельный MCP сервер только для напоминаний
+    configureRemindersMcpServer(
         reminderService = AppContainer.reminderService
     )
 

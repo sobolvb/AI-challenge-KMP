@@ -5,6 +5,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
+import io.ktor.client.plugins.sse.SSE
 import io.ktor.http.ContentType
 import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
 import io.ktor.serialization.kotlinx.json.*
@@ -19,6 +20,7 @@ object ChatClientProvider {
 
     private val httpClient: HttpClient by lazy {
         HttpClient(CIO) {
+            install(SSE)
             // Отключаем таймауты для долгоживущих соединений (SSE)
             install(HttpTimeout) {
                 // бесконечный таймаут

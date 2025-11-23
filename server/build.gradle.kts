@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.sqldelight.driver.sqlite)
     implementation(libs.sqldelight.coroutines)
     implementation(libs.runtime)
+    implementation("io.ktor:ktor-server-websockets:3.0.3")
 
     // Koin - УДАЛЕН из-за несовместимости с Ktor 3.x
     // Используем manual DI вместо Koin

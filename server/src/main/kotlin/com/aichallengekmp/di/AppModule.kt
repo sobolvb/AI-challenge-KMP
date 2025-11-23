@@ -4,16 +4,25 @@ import com.aichallengekmp.ai.ModelRegistry
 import com.aichallengekmp.ai.YandexGPTProvider
 import com.aichallengekmp.database.DatabaseFactory
 import com.aichallengekmp.database.dao.*
+import com.aichallengekmp.mcp.McpClientRegistry
+import com.aichallengekmp.mcp.McpServerClient
+import com.aichallengekmp.mcp.McpServerConfig
 import com.aichallengekmp.service.ChatService
 import com.aichallengekmp.service.CompressionService
 import com.aichallengekmp.service.ReminderService
+import com.aichallengekmp.tools.LocalToolExecutor
+import com.aichallengekmp.tools.McpAwareToolExecutor
+import com.aichallengekmp.tools.ToolExecutor
 import com.aichallengekmp.tools.TrackerToolsService
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.sse.SSE
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+
 
 /**
  * Manual DI container - заменяет Koin из-за несовместимости с Ktor 3.x
@@ -28,15 +37,26 @@ object AppContainer {
         AppConfig(
             yandexApiKey = System.getenv("YANDEX_API_KEY") ?: error("YANDEX_API_KEY not set"),
             yandexFolderId = System.getenv("YANDEX_MODEL_URI") ?: error("YANDEX_MODEL_URI not set"),
-            dbPath = System.getenv("DB_PATH") ?: "chat.db"
+            dbPath = System.getenv("DB_PATH") ?: "chat.db",
+            // MCP endpoints. Жёстко используем единый HTTP(S) эндпоинт /mcp для обоих клиентов,
+            // чтобы избежать влияния переменных окружения и расхождений в конфигурации.
+            // Для SseClientTransport нужны HTTP(S) URL (http:// или https://).
+//            mcpTrackerUrl = "http://localhost:8080/mcp/tracker",
+//            mcpRemindersUrl = "http://localhost:8080/mcp/reminders"
+            mcpTrackerUrl = "http://localhost:8080/mcp",
+            mcpRemindersUrl = "http://localhost:8080/mcp"
         )
     }
     
     // ============= HTTP Client =============
-    
+
     val httpClient by lazy {
         logger.info("🌐 Создание HTTP клиента")
         HttpClient(CIO) {
+            install(SSE)
+            // нужно MCP-клиенту для WebSocketClientTransport
+            install(WebSockets)
+
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
@@ -47,7 +67,7 @@ object AppContainer {
             }
         }
     }
-    
+
     // ============= Database =============
     
     val database by lazy {
@@ -66,11 +86,67 @@ object AppContainer {
     
     // ============= Services =============
     
+    val reminderService by lazy {
+        ReminderService(reminderDao)
+    }
+
+    /**
+     * Локальная реализация инструментов (без MCP) — используется как
+     * fallback и для MCP-серверов.
+     */
     val trackerTools by lazy {
-        logger.info("🔧 Инициализация TrackerToolsService")
+        logger.info("🔧 Инициализация TrackerToolsService (локальные инструменты)")
         TrackerToolsService(reminderService)
     }
-    
+
+    /**
+     * MCP-клиенты к внешним MCP-серверам (tracker, reminders, ...).
+     * Могут быть отключены через конфиг (feature-флаги).
+     */
+    private val mcpClientsById by lazy {
+        logger.info("🌉 Инициализация MCP-клиентов (если включены фичи)")
+
+        val trackerConfig = McpServerConfig(
+            id = "tracker",
+            baseUrl = config.mcpTrackerUrl,
+            toolNames = setOf("get_issues_count", "get_all_issue_names", "get_issue_info")
+        )
+        val remindersConfig = McpServerConfig(
+            id = "reminders",
+            baseUrl = config.mcpRemindersUrl,
+            toolNames = setOf("create_reminder", "list_reminders", "delete_reminder")
+        )
+
+        mapOf(
+            trackerConfig.id to McpServerClient(trackerConfig, httpClient),
+            remindersConfig.id to McpServerClient(remindersConfig, httpClient)
+        )
+    }
+
+    /**
+     * Реестр MCP-клиентов с маршрутизацией toolName -> serverId.
+     */
+    val mcpClientRegistry: McpClientRegistry by lazy {
+        val toolToServer = mapOf(
+            "get_issues_count" to "tracker",
+            "get_all_issue_names" to "tracker",
+            "get_issue_info" to "tracker",
+            "create_reminder" to "reminders",
+            "list_reminders" to "reminders",
+            "delete_reminder" to "reminders"
+        )
+        McpClientRegistry(mcpClientsById, toolToServer)
+    }
+
+    /**
+     * Оркестратор инструментов для YandexGPT — всё через MCP.
+     */
+    val toolExecutor: ToolExecutor by lazy {
+        //McpAwareToolExecutor(mcpClientRegistry)
+        LocalToolExecutor(reminderService)
+
+    }
+
     // ============= AI Providers =============
     
     val modelRegistry by lazy {
@@ -83,7 +159,7 @@ object AppContainer {
                 httpClient = httpClient,
                 apiKey = config.yandexApiKey,
                 folderId = config.yandexFolderId,
-                trackerTools = trackerTools  // Передаем TrackerToolsService
+                toolExecutor = toolExecutor  // Все вызовы инструментов идут через оркестратор (MCP внутри)
             )
             registry.registerProvider(yandexProvider)
         } else {
@@ -111,11 +187,8 @@ object AppContainer {
             trackerTools = trackerTools
         )
     }
-
-    val reminderService by lazy {
-        ReminderService(reminderDao)
-    }
 }
+
 
 /**
  * Конфигурация приложения
@@ -123,5 +196,7 @@ object AppContainer {
 data class AppConfig(
     val yandexApiKey: String,
     val yandexFolderId: String,
-    val dbPath: String
+    val dbPath: String,
+    val mcpTrackerUrl: String,
+    val mcpRemindersUrl: String
 )

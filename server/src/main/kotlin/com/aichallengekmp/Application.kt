@@ -15,11 +15,13 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
+import io.ktor.server.websocket.WebSockets
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+
 
 @ExperimentalSerializationApi
 fun Application.module() {
@@ -43,7 +45,10 @@ fun Application.module() {
     
     // SSE для MCP
     install(SSE)
-    
+
+    // WebSockets для MCP (нужен для WebSocketClientTransport)
+    install(WebSockets)
+
     // MCP Server для Яндекс.Трекер + напоминания (единый, для обратной совместимости)
     configureMcpServer(
         trackerTools = AppContainer.trackerTools,
@@ -96,13 +101,13 @@ fun Application.module() {
     // Routing (без дублирования ContentNegotiation)
     routing {
         // Health check endpoint
-        get("/health") {
-            call.respond(mapOf(
-                "status" to "OK",
-                "service" to "AI Challenge KMP",
-                "timestamp" to System.currentTimeMillis()
-            ))
-        }
+//        get("/health") {
+//            call.respond(mapOf(
+//                "status" to "OK",
+//                "service" to "AI Challenge KMP",
+//                "timestamp" to System.currentTimeMillis()
+//            ))
+//        }
 
         // Chat API routes
         route("/api") {

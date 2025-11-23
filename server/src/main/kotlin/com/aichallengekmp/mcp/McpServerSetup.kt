@@ -15,8 +15,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * Настройка MCP сервера для Яндекс.Трекер + инструмента напоминаний
- * Добавляет SSE эндпоинт /mcp для подключения MCP клиентов
+ * Настройка MCP сервера для Яндекс.Трекер + инструмента напоминаний.
+ * Добавляет MCP эндпоинт /mcp для подключения MCP‑клиентов (WebSocket/SSE —
+ * это уже деталь реализации библиотеки io.modelcontextprotocol.kotlin.sdk.server.mcp).
  */
 fun Application.configureMcpServer(
     trackerTools: TrackerToolsService,

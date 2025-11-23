@@ -18,7 +18,7 @@ class YandexGPTProvider(
     private val httpClient: HttpClient,
     private val apiKey: String,
     private val folderId: String,
-    private val trackerTools: com.aichallengekmp.tools.TrackerToolsService? = null
+    private val toolExecutor: com.aichallengekmp.tools.ToolExecutor? = null
 ) : AIProvider {
 
     private val logger = LoggerFactory.getLogger(YandexGPTProvider::class.java)
@@ -419,18 +419,18 @@ class YandexGPTProvider(
      * Выполнить функцию (инструмент)
      */
     private suspend fun executeFunction(name: String, arguments: JsonElement): String {
-        if (trackerTools == null) {
-            return "Ошибка: TrackerToolsService не подключен"
+        if (toolExecutor == null) {
+            return "Ошибка: исполнение инструментов (ToolExecutor) не настроено на сервере"
         }
 
         // Парсим аргументы
-        val args = if (arguments is JsonObject) {
+        val args: Map<String, Any?> = if (arguments is JsonObject) {
             arguments.entries.associate { it.key to it.value.toString().trim('"') }
         } else {
             emptyMap()
         }
 
-        return trackerTools.executeTool(name, args)
+        return toolExecutor.executeTool(name, args)
     }
 
     private fun convertToYandexTool(tool: ToolDefinition): YandexTool {

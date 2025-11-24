@@ -4,9 +4,13 @@ import com.aichallengekmp.ai.ModelRegistry
 import com.aichallengekmp.ai.YandexGPTProvider
 import com.aichallengekmp.database.DatabaseFactory
 import com.aichallengekmp.database.dao.*
+import com.aichallengekmp.database.dao.RagChunkDao
 import com.aichallengekmp.mcp.McpClientRegistry
 import com.aichallengekmp.mcp.McpServerClient
 import com.aichallengekmp.mcp.McpServerConfig
+import com.aichallengekmp.rag.OllamaEmbeddingsProvider
+import com.aichallengekmp.rag.RagIndexService
+import com.aichallengekmp.rag.RagSearchService
 import com.aichallengekmp.service.ChatService
 import com.aichallengekmp.service.CompressionService
 import com.aichallengekmp.service.ReminderService
@@ -83,6 +87,26 @@ object AppContainer {
     val sessionSettingsDao by lazy { SessionSettingsDao(database) }
     val compressionDao by lazy { CompressionDao(database) }
     val reminderDao by lazy { ReminderDao(database) }
+    val ragChunkDao by lazy { RagChunkDao(database) }
+    
+    // ============= RAG / Embeddings =============
+
+    val embeddingsProvider by lazy {
+        logger.info("🧠 Инициализация OllamaEmbeddingsProvider")
+        OllamaEmbeddingsProvider(
+            httpClient = httpClient,
+            baseUrl = System.getenv("OLLAMA_BASE_URL") ?: "http://localhost:11434",
+            model = System.getenv("OLLAMA_EMBED_MODEL") ?: "nomic-embed-text"
+        )
+    }
+
+    val ragIndexService by lazy {
+        RagIndexService(ragChunkDao, embeddingsProvider)
+    }
+
+    val ragSearchService by lazy {
+        RagSearchService(ragChunkDao, embeddingsProvider)
+    }
     
     // ============= Services =============
     

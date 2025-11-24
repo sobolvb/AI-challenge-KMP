@@ -1,5 +1,6 @@
 package com.aichallengekmp.tools
 
+import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.mcpfromanother.YandexTrackerClient
 import com.aichallengekmp.service.ReminderService
 import org.slf4j.LoggerFactory
@@ -106,6 +107,27 @@ class LocalToolExecutor(
 
                     reminderService.deleteReminder(id)
                     "Напоминание #$id удалено"
+                }
+
+                "search_docs" -> {
+                    val query = arguments["query"]?.toString()?.takeIf { it.isNotBlank() }
+                        ?: return "Ошибка: не указан параметр 'query'"
+
+                    val topK = arguments["top_k"]?.toString()?.toIntOrNull() ?: 5
+
+                    val hits = AppContainer.ragSearchService.search(query, topK)
+                    if (hits.isEmpty()) {
+                        "По вашему запросу ничего не найдено в локальном индексе документов."
+                    } else {
+                        buildString {
+                            appendLine("Найдено релевантных фрагментов: ${hits.size}")
+                            hits.forEach { h ->
+                                appendLine()
+                                appendLine("Источник: ${h.sourceId}, чанк #${h.chunkIndex}, score=${"%.3f".format(h.score)}")
+                                appendLine(h.text)
+                            }
+                        }
+                    }
                 }
 
                 else -> "Неизвестный инструмент (локальный): $toolName"

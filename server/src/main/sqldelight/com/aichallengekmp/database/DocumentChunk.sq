@@ -1,0 +1,21 @@
+-- Таблица для хранения чанков документов для RAG
+CREATE TABLE DocumentChunk (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sourceId TEXT NOT NULL,
+    chunkIndex INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    embedding TEXT NOT NULL
+);
+
+-- Удалить все чанки по sourceId
+deleteBySourceId:
+DELETE FROM DocumentChunk WHERE sourceId = ?;
+
+-- Вставить один чанк документа
+insertChunk:
+INSERT INTO DocumentChunk(sourceId, chunkIndex, text, embedding)
+VALUES (?, ?, ?, ?);
+
+-- Получить все чанки
+selectAll:
+SELECT * FROM DocumentChunk ORDER BY sourceId, chunkIndex;

@@ -52,8 +52,14 @@ fun ChatScreen(
                 onCancelClick = viewModel::cancelGeneration,
                 onToggleDefaultSettings = viewModel::toggleDefaultSettingsPanel,
                 onDefaultSettingsChange = viewModel::updateDefaultSettings,
-                onClearError = viewModel::clearError,
+                onClearError = {
+                    viewModel.clearError()
+                    viewModel.clearRagResult()
+                },
                 onSettingsClick = { viewModel.toggleSettingsDialog(true) },
+                ragCompareEnabled = uiState.ragCompareEnabled,
+                ragResult = uiState.lastRagResult,
+                onToggleRagCompare = viewModel::toggleRagCompare,
                 modifier = Modifier.weight(1f)
             )
         }

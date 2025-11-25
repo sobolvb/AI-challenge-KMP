@@ -21,6 +21,9 @@ interface ChatRepository {
     suspend fun deleteSession(sessionId: String): Result<Unit>
     suspend fun getAvailableModels(): Result<List<ModelInfoDto>>
 
+    // RAG эксперимент: сравнение ответов с/без документации
+    suspend fun askRag(request: RagAskRequest): Result<RagAskResponse>
+
     /**
      * Подписка на SSE-стрим напоминаний.
      * Блокирующий вызов: пока соединение открыто, onSummary вызывается при каждом событии.
@@ -78,6 +81,13 @@ class KtorChatRepository(
     override suspend fun getAvailableModels(): Result<List<ModelInfoDto>> = runCatching {
         client.get("$baseUrl/api/models") {
             accept(ContentType.Application.Json)
+        }.body()
+    }
+
+    override suspend fun askRag(request: RagAskRequest): Result<RagAskResponse> = runCatching {
+        client.post("$baseUrl/api/rag/ask") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
         }.body()
     }
 

@@ -32,7 +32,11 @@ data class ChatUiState(
     val showDeleteConfirmation: String? = null, // sessionId для подтверждения удаления
     
     // Счетчик для генерации названий новых чатов
-    val sessionCounter: Int = 1
+    val sessionCounter: Int = 1,
+
+    // RAG: включён ли режим сравнения и последний результат
+    val ragCompareEnabled: Boolean = false,
+    val lastRagResult: RagAskResponse? = null
 )
 
 /**

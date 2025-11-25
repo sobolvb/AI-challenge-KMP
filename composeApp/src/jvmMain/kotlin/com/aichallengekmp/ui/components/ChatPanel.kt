@@ -1,10 +1,14 @@
 package com.aichallengekmp.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -36,6 +40,9 @@ fun ChatPanel(
     onDefaultSettingsChange: (SessionSettingsDto) -> Unit,
     onClearError: () -> Unit,
     onSettingsClick: () -> Unit,
+    ragCompareEnabled: Boolean,
+    ragResult: RagAskResponse?,
+    onToggleRagCompare: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -54,7 +61,10 @@ fun ChatPanel(
                 onSendClick = onSendClick,
                 onCancelClick = onCancelClick,
                 onClearError = onClearError,
-                onSettingsClick = onSettingsClick
+                onSettingsClick = onSettingsClick,
+                ragCompareEnabled = ragCompareEnabled,
+                ragResult = ragResult,
+                onToggleRagCompare = onToggleRagCompare
             )
         } else {
             // Нет выбранной сессии - показываем placeholder
@@ -70,7 +80,10 @@ fun ChatPanel(
                 onCancelClick = onCancelClick,
                 onToggleSettings = onToggleDefaultSettings,
                 onSettingsChange = onDefaultSettingsChange,
-                onClearError = onClearError
+                onClearError = onClearError,
+                ragCompareEnabled = ragCompareEnabled,
+                ragResult = ragResult,
+                onToggleRagCompare = onToggleRagCompare
             )
         }
     }
@@ -89,7 +102,10 @@ private fun ChatContent(
     onSendClick: () -> Unit,
     onCancelClick: () -> Unit,
     onClearError: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    ragCompareEnabled: Boolean,
+    ragResult: RagAskResponse?,
+    onToggleRagCompare: (Boolean) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Заголовок с названием сессии и кнопкой настроек
@@ -150,9 +166,12 @@ private fun ChatContent(
         MessageInput(
             message = pendingMessage,
             isSending = isSending,
+            ragCompareEnabled = ragCompareEnabled,
+            ragResult = ragResult,
             onMessageChange = onMessageChange,
             onSendClick = onSendClick,
-            onCancelClick = onCancelClick
+            onCancelClick = onCancelClick,
+            onToggleRagCompare = onToggleRagCompare
         )
     }
 }
@@ -173,7 +192,10 @@ private fun EmptyState(
     onCancelClick: () -> Unit,
     onToggleSettings: (Boolean) -> Unit,
     onSettingsChange: (SessionSettingsDto) -> Unit,
-    onClearError: () -> Unit
+    onClearError: () -> Unit,
+    ragCompareEnabled: Boolean,
+    ragResult: RagAskResponse?,
+    onToggleRagCompare: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -265,9 +287,12 @@ private fun EmptyState(
         MessageInput(
             message = pendingMessage,
             isSending = isSending,
+            ragCompareEnabled = ragCompareEnabled,
+            ragResult = ragResult,
             onMessageChange = onMessageChange,
             onSendClick = onSendClick,
-            onCancelClick = onCancelClick
+            onCancelClick = onCancelClick,
+            onToggleRagCompare = onToggleRagCompare
         )
     }
 }
@@ -304,17 +329,21 @@ private fun MessageList(
 }
 
 /**
- * Поле ввода сообщения
+ * Поле ввода сообщения + галочка RAG и результат сравнения
  */
 @Composable
 private fun MessageInput(
     message: String,
     isSending: Boolean,
+    ragCompareEnabled: Boolean,
+    ragResult: RagAskResponse?,
     onMessageChange: (String) -> Unit,
     onSendClick: () -> Unit,
-    onCancelClick: () -> Unit
+    onCancelClick: () -> Unit,
+    onToggleRagCompare: (Boolean) -> Unit
 ) {
-    Column {
+    Column(Modifier
+    .verticalScroll(rememberScrollState())) {
         OutlinedTextField(
             value = message,
             onValueChange = onMessageChange,
@@ -328,39 +357,136 @@ private fun MessageInput(
         
         Spacer(modifier = Modifier.height(8.dp))
         
+        // Строка: слева галочка RAG, справа кнопка отправки / индикатор
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isSending) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Checkbox(
+                    checked = ragCompareEnabled,
+                    onCheckedChange = { onToggleRagCompare(it) },
+                    enabled = !isSending
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Модель думает...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Сравнить с документацией (RAG)",
+                    style = MaterialTheme.typography.bodySmall
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = onCancelClick) {
-                    Text("Прервать")
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isSending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Модель думает...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = onCancelClick) {
+                        Text("Прервать")
+                    }
+                } else {
+                    Button(
+                        onClick = onSendClick,
+                        enabled = message.trim().isNotEmpty()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Отправить")
+                        }
+                    }
                 }
-            } else {
-                Button(
-                    onClick = onSendClick,
-                    enabled = message.trim().isNotEmpty()
+            }
+        }
+
+        // Если есть результат RAG-сравнения — показываем его под полем ввода
+        ragResult?.let { result ->
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Результат сравнения для вопроса:",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = result.question,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // WITH RAG
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "С документацией (RAG)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Отправить")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = result.withRag.answer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "⚡ ${result.withRag.tokenUsage.totalTokens} tokens (in: ${result.withRag.tokenUsage.inputTokens}, out: ${result.withRag.tokenUsage.outputTokens})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // WITHOUT RAG
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Без RAG (baseline)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = result.withoutRag.answer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "⚡ ${result.withoutRag.tokenUsage.totalTokens} tokens (in: ${result.withoutRag.tokenUsage.inputTokens}, out: ${result.withoutRag.tokenUsage.outputTokens})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

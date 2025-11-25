@@ -88,6 +88,41 @@ data class ModelInfoDto(
     val displayName: String
 )
 
+// ============= RAG Experiment =============
+
+@Serializable
+data class RagChunkDto(
+    val sourceId: String,
+    val chunkIndex: Int,
+    val score: Double,
+    val text: String
+)
+
+@Serializable
+data class RagAnswerVariantDto(
+    val answer: String,
+    val modelId: String,
+    val tokenUsage: TokenUsageDto
+)
+
+@Serializable
+data class RagAskRequest(
+    val question: String,
+    val topK: Int = 5,
+    val modelId: String = "yandexgpt-lite",
+    val temperature: Double = 0.6,
+    val maxTokens: Int = 1000,
+    val systemPrompt: String? = null
+)
+
+@Serializable
+data class RagAskResponse(
+    val question: String,
+    val withRag: RagAnswerVariantDto,
+    val withoutRag: RagAnswerVariantDto,
+    val usedChunks: List<RagChunkDto>
+)
+
 // ============= Common Responses =============
 
 @Serializable

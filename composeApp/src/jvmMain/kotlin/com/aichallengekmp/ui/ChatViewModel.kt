@@ -31,6 +31,14 @@ class ChatViewModel(
     }
     
     // ============= Public Actions =============
+
+    fun toggleRagCompare(enabled: Boolean) {
+        _uiState.update { it.copy(ragCompareEnabled = enabled) }
+    }
+
+    fun clearRagResult() {
+        _uiState.update { it.copy(lastRagResult = null) }
+    }
     
     /**
      * Загрузить начальные данные (сессии + модели)
@@ -133,14 +141,19 @@ class ChatViewModel(
         }
         
         viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, error = null) }
+            _uiState.update { it.copy(isSending = true, error = null, lastRagResult = null) }
             
             try {
-                // Если сессия не выбрана - создаем новую
-                if (currentState.selectedSession == null) {
-                    createNewSession(message)
+                if (currentState.ragCompareEnabled) {
+                    // 🔎 Режим сравнения RAG / без RAG
+                    sendWithRagComparison(message)
                 } else {
-                    sendToExistingSession(currentState.selectedSession.id, message)
+                    // Если сессия не выбрана - создаем новую
+                    if (currentState.selectedSession == null) {
+                        createNewSession(message)
+                    } else {
+                        sendToExistingSession(currentState.selectedSession.id, message)
+                    }
                 }
             } catch (e: Exception) {
                 logger.error("❌ Ошибка при отправке сообщения: ${e.message}", e)
@@ -368,6 +381,44 @@ class ChatViewModel(
                         isSending = false,
                         error = ErrorState(
                             message = "Не удалось создать сессию",
+                            details = error.message
+                        )
+                    )
+                }
+            }
+    }
+    
+    private suspend fun sendWithRagComparison(message: String) {
+        val state = _uiState.value
+        val settings = state.selectedSession?.settings ?: state.defaultSettings
+
+        val request = RagAskRequest(
+            question = message,
+            topK = 5,
+            modelId = settings.modelId,
+            temperature = settings.temperature,
+            maxTokens = settings.maxTokens,
+            systemPrompt = settings.systemPrompt
+        )
+
+        repository.askRag(request)
+            .onSuccess { response ->
+                logger.info("✅ Получен результат RAG-сравнения")
+                _uiState.update {
+                    it.copy(
+                        pendingMessage = "",
+                        isSending = false,
+                        lastRagResult = response
+                    )
+                }
+            }
+            .onFailure { error ->
+                logger.error("❌ Ошибка RAG-запроса: ${error.message}", error)
+                _uiState.update {
+                    it.copy(
+                        isSending = false,
+                        error = ErrorState(
+                            message = "Не удалось выполнить RAG-запрос",
                             details = error.message
                         )
                     )

@@ -108,19 +108,27 @@ data class RagAnswerVariantDto(
 @Serializable
 data class RagAskRequest(
     val question: String,
-    val topK: Int = 5,
+    val topK: Int = 10,
     val modelId: String = "yandexgpt-lite",
     val temperature: Double = 0.6,
     val maxTokens: Int = 1000,
-    val systemPrompt: String? = null
+    val systemPrompt: String? = null,
+    /**
+     * Порог отсечения нерелевантных результатов по косинусному сходству.
+     * null = использовать значение по умолчанию на сервере.
+     */
+    val similarityThreshold: Double? = null
 )
 
 @Serializable
 data class RagAskResponse(
     val question: String,
     val withRag: RagAnswerVariantDto,
+    val withRagFiltered: RagAnswerVariantDto? = null,
     val withoutRag: RagAnswerVariantDto,
-    val usedChunks: List<RagChunkDto>
+    val usedChunks: List<RagChunkDto>,
+    val usedChunksFiltered: List<RagChunkDto>? = null,
+    val similarityThreshold: Double? = null
 )
 
 // ============= Common Responses =============

@@ -59,7 +59,9 @@ fun ChatScreen(
                 onSettingsClick = { viewModel.toggleSettingsDialog(true) },
                 ragCompareEnabled = uiState.ragCompareEnabled,
                 ragResult = uiState.lastRagResult,
+                ragSimilarityThreshold = uiState.ragSimilarityThreshold,
                 onToggleRagCompare = viewModel::toggleRagCompare,
+                onChangeRagThreshold = viewModel::updateRagThreshold,
                 modifier = Modifier.weight(1f)
             )
         }

@@ -113,7 +113,7 @@ class LocalToolExecutor(
                     val query = arguments["query"]?.toString()?.takeIf { it.isNotBlank() }
                         ?: return "Ошибка: не указан параметр 'query'"
 
-                    val topK = arguments["top_k"]?.toString()?.toIntOrNull() ?: 5
+                    val topK = arguments["top_k"]?.toString()?.toIntOrNull() ?: 10
 
                     val hits = AppContainer.ragSearchService.search(query, topK)
                     if (hits.isEmpty()) {

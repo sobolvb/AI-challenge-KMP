@@ -36,7 +36,10 @@ data class ChatUiState(
 
     // RAG: включён ли режим сравнения и последний результат
     val ragCompareEnabled: Boolean = false,
-    val lastRagResult: RagAskResponse? = null
+    val lastRagResult: RagAskResponse? = null,
+
+    // Настраиваемый порог похожести для фильтрации RAG (0.0–1.0)
+    val ragSimilarityThreshold: Double = 0.1
 )
 
 /**

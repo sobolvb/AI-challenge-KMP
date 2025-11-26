@@ -1,8 +1,6 @@
 package com.aichallengekmp.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,7 +40,9 @@ fun ChatPanel(
     onSettingsClick: () -> Unit,
     ragCompareEnabled: Boolean,
     ragResult: RagAskResponse?,
+    ragSimilarityThreshold: Double,
     onToggleRagCompare: (Boolean) -> Unit,
+    onChangeRagThreshold: (Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -64,7 +64,9 @@ fun ChatPanel(
                 onSettingsClick = onSettingsClick,
                 ragCompareEnabled = ragCompareEnabled,
                 ragResult = ragResult,
-                onToggleRagCompare = onToggleRagCompare
+                ragSimilarityThreshold = ragSimilarityThreshold,
+                onToggleRagCompare = onToggleRagCompare,
+                onChangeRagThreshold = onChangeRagThreshold
             )
         } else {
             // Нет выбранной сессии - показываем placeholder
@@ -83,7 +85,9 @@ fun ChatPanel(
                 onClearError = onClearError,
                 ragCompareEnabled = ragCompareEnabled,
                 ragResult = ragResult,
-                onToggleRagCompare = onToggleRagCompare
+                ragSimilarityThreshold = ragSimilarityThreshold,
+                onToggleRagCompare = onToggleRagCompare,
+                onChangeRagThreshold = onChangeRagThreshold
             )
         }
     }
@@ -105,7 +109,9 @@ private fun ChatContent(
     onSettingsClick: () -> Unit,
     ragCompareEnabled: Boolean,
     ragResult: RagAskResponse?,
-    onToggleRagCompare: (Boolean) -> Unit
+    ragSimilarityThreshold: Double,
+    onToggleRagCompare: (Boolean) -> Unit,
+    onChangeRagThreshold: (Double) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Заголовок с названием сессии и кнопкой настроек
@@ -168,10 +174,12 @@ private fun ChatContent(
             isSending = isSending,
             ragCompareEnabled = ragCompareEnabled,
             ragResult = ragResult,
+            similarityThreshold = ragSimilarityThreshold,
             onMessageChange = onMessageChange,
             onSendClick = onSendClick,
             onCancelClick = onCancelClick,
-            onToggleRagCompare = onToggleRagCompare
+            onToggleRagCompare = onToggleRagCompare,
+            onChangeThreshold = onChangeRagThreshold
         )
     }
 }
@@ -195,7 +203,9 @@ private fun EmptyState(
     onClearError: () -> Unit,
     ragCompareEnabled: Boolean,
     ragResult: RagAskResponse?,
-    onToggleRagCompare: (Boolean) -> Unit
+    ragSimilarityThreshold: Double,
+    onToggleRagCompare: (Boolean) -> Unit,
+    onChangeRagThreshold: (Double) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -289,10 +299,12 @@ private fun EmptyState(
             isSending = isSending,
             ragCompareEnabled = ragCompareEnabled,
             ragResult = ragResult,
+            similarityThreshold = ragSimilarityThreshold,
             onMessageChange = onMessageChange,
             onSendClick = onSendClick,
             onCancelClick = onCancelClick,
-            onToggleRagCompare = onToggleRagCompare
+            onToggleRagCompare = onToggleRagCompare,
+            onChangeThreshold = onChangeRagThreshold
         )
     }
 }
@@ -337,13 +349,16 @@ private fun MessageInput(
     isSending: Boolean,
     ragCompareEnabled: Boolean,
     ragResult: RagAskResponse?,
+    similarityThreshold: Double,
     onMessageChange: (String) -> Unit,
     onSendClick: () -> Unit,
     onCancelClick: () -> Unit,
-    onToggleRagCompare: (Boolean) -> Unit
+    onToggleRagCompare: (Boolean) -> Unit,
+    onChangeThreshold: (Double) -> Unit
 ) {
-    Column(Modifier
-    .verticalScroll(rememberScrollState())) {
+    Column(
+        Modifier.verticalScroll(rememberScrollState())
+    ) {
         OutlinedTextField(
             value = message,
             onValueChange = onMessageChange,
@@ -372,10 +387,22 @@ private fun MessageInput(
                     enabled = !isSending
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Сравнить с документацией (RAG)",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Column {
+                    Text(
+                        text = "Сравнить с документацией (RAG)",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (ragCompareEnabled) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Порог: ${String.format("%.2f", similarityThreshold)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
 
             Row(
@@ -420,7 +447,8 @@ private fun MessageInput(
 
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Результат сравнения для вопроса:",
+                text = "Результат сравнения для вопроса (порог фильтра: " +
+                        (result.similarityThreshold?.let { String.format("%.2f", it) } ?: "—") + "):",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -436,33 +464,6 @@ private fun MessageInput(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // WITH RAG
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(
-                            text = "С документацией (RAG)",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = result.withRag.answer,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "⚡ ${result.withRag.tokenUsage.totalTokens} tokens (in: ${result.withRag.tokenUsage.inputTokens}, out: ${result.withRag.tokenUsage.outputTokens})",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
                 // WITHOUT RAG
                 Card(
                     modifier = Modifier.weight(1f),
@@ -487,6 +488,62 @@ private fun MessageInput(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+
+                // WITH RAG (без фильтра)
+                Card(
+                    modifier = Modifier.weight(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "RAG без фильтра",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = result.withRag.answer,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "⚡ ${result.withRag.tokenUsage.totalTokens} tokens (in: ${result.withRag.tokenUsage.inputTokens}, out: ${result.withRag.tokenUsage.outputTokens})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // WITH RAG + FILTER
+                result.withRagFiltered?.let { filtered ->
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = "RAG с фильтром",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = filtered.answer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "⚡ ${filtered.tokenUsage.totalTokens} tokens (in: ${filtered.tokenUsage.inputTokens}, out: ${filtered.tokenUsage.outputTokens})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

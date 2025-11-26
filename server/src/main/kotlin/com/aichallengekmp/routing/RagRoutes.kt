@@ -141,11 +141,30 @@ fun Route.ragRoutes() {
                     )
                 }
 
+                // 1.1. Второй этап: фильтрация по порогу похожести
+                val effectiveThreshold = request.similarityThreshold ?: 0.3
+                val filteredHits = hits.filter { it.score >= effectiveThreshold }
+                logger.info(
+                    "🔎 Фильтрация результатов RAG по порогу {}: до={}, после={}",
+                    String.format("%.3f", effectiveThreshold),
+                    hits.size,
+                    filteredHits.size
+                )
+
+                val usedChunksFiltered = filteredHits.map { hit ->
+                    RagChunkDto(
+                        sourceId = hit.sourceId,
+                        chunkIndex = hit.chunkIndex,
+                        score = hit.score,
+                        text = hit.text
+                    )
+                }
+
                 // Базовый system prompt (общие инструкции), без RAG-контекста
                 val baseSystemPrompt = request.systemPrompt?.takeIf { it.isNotBlank() }
                     ?: "Ты — помощник разработчика. Отвечай кратко и по делу на русском языке."
 
-                // 2. Формируем запрос с RAG-контекстом (явно включаем найденные чанки)
+                // 2. Формируем запрос с RAG-контекстом (явно включаем найденные чанки, без фильтра)
                 val ragUserContent = buildString {
                     if (hits.isNotEmpty()) {
                         appendLine("Ниже приведены фрагменты документации проекта, которые могут быть полезны для ответа на вопрос.")
@@ -181,7 +200,7 @@ fun Route.ragRoutes() {
                 )
 
                 val withRagResult = AppContainer.modelRegistry.complete(withRagRequest)
-                logger.info("✅ Ответ с RAG получен (tokens in={}, out={})",
+                logger.info("✅ Ответ с RAG (без фильтра) получен (tokens in={}, out={})",
                     withRagResult.tokenUsage.inputTokens,
                     withRagResult.tokenUsage.outputTokens
                 )
@@ -195,6 +214,59 @@ fun Route.ragRoutes() {
                         totalTokens = withRagResult.tokenUsage.totalTokens
                     )
                 )
+
+                // 2.1. Запрос с фильтрованным RAG-контекстом (threshold)
+                val withRagFilteredDto: RagAnswerVariantDto? = if (filteredHits.isNotEmpty()) {
+                    val ragUserContentFiltered = buildString {
+                        appendLine("Ниже приведены отфильтрованные по порогу похожести фрагменты документации.")
+                        appendLine("Используй ИМЕННО ИХ при ответе.")
+                        appendLine("Порог косинусного сходства: " + String.format("%.3f", effectiveThreshold))
+                        appendLine()
+
+                        filteredHits.forEachIndexed { index, hit ->
+                            appendLine("### Фрагмент ${index + 1} (sourceId=${hit.sourceId}, score=${hit.score})")
+                            appendLine(hit.text)
+                            appendLine()
+                        }
+
+                        appendLine("--- ВОПРОС ПОЛЬЗОВАТЕЛЯ ---")
+                        appendLine(request.question)
+                    }
+
+                    val withRagFilteredRequest = CompletionRequest(
+                        modelId = request.modelId,
+                        messages = listOf(
+                            AIMessage(role = "user", content = ragUserContentFiltered)
+                        ),
+                        temperature = request.temperature,
+                        maxTokens = request.maxTokens,
+                        systemPrompt = baseSystemPrompt,
+                        tools = null
+                    )
+
+                    val withRagFilteredResult = AppContainer.modelRegistry.complete(withRagFilteredRequest)
+                    logger.info(
+                        "✅ Ответ с RAG (с фильтром, threshold={}) получен (tokens in={}, out={})",
+                        String.format("%.3f", effectiveThreshold),
+                        withRagFilteredResult.tokenUsage.inputTokens,
+                        withRagFilteredResult.tokenUsage.outputTokens
+                    )
+
+                    RagAnswerVariantDto(
+                        answer = withRagFilteredResult.text,
+                        modelId = withRagFilteredResult.modelId,
+                        tokenUsage = TokenUsageDto(
+                            inputTokens = withRagFilteredResult.tokenUsage.inputTokens,
+                            outputTokens = withRagFilteredResult.tokenUsage.outputTokens,
+                            totalTokens = withRagFilteredResult.tokenUsage.totalTokens
+                        )
+                    )
+                } else {
+                    logger.info("ℹ️ После фильтрации по порогу {} не осталось фрагментов — пропускаем вариант withRagFiltered",
+                        String.format("%.3f", effectiveThreshold)
+                    )
+                    null
+                }
 
                 // 3. Формируем baseline-запрос (тот же вопрос, но БЕЗ RAG и без контекста)
                 val baselineRequest = CompletionRequest(
@@ -227,8 +299,11 @@ fun Route.ragRoutes() {
                 val response = RagAskResponse(
                     question = request.question,
                     withRag = withRagDto,
+                    withRagFiltered = withRagFilteredDto,
                     withoutRag = withoutRagDto,
-                    usedChunks = usedChunks
+                    usedChunks = usedChunks,
+                    usedChunksFiltered = usedChunksFiltered.takeIf { it.isNotEmpty() },
+                    similarityThreshold = effectiveThreshold
                 )
 
                 call.respond(HttpStatusCode.OK, response)

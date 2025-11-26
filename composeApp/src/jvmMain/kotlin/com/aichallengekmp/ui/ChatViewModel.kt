@@ -39,6 +39,11 @@ class ChatViewModel(
     fun clearRagResult() {
         _uiState.update { it.copy(lastRagResult = null) }
     }
+
+    fun updateRagThreshold(threshold: Double) {
+        val clamped = threshold.coerceIn(0.0, 1.0)
+        _uiState.update { it.copy(ragSimilarityThreshold = clamped) }
+    }
     
     /**
      * Загрузить начальные данные (сессии + модели)
@@ -394,11 +399,12 @@ class ChatViewModel(
 
         val request = RagAskRequest(
             question = message,
-            topK = 5,
+            topK = 10,
             modelId = settings.modelId,
             temperature = settings.temperature,
             maxTokens = settings.maxTokens,
-            systemPrompt = settings.systemPrompt
+            systemPrompt = settings.systemPrompt,
+            similarityThreshold = state.ragSimilarityThreshold
         )
 
         repository.askRag(request)

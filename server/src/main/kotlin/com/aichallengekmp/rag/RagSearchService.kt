@@ -26,7 +26,7 @@ class RagSearchService(
 
     private val logger = LoggerFactory.getLogger(RagSearchService::class.java)
 
-    suspend fun search(query: String, topK: Int = 5): List<RagHit> = withContext(Dispatchers.Default) {
+    suspend fun search(query: String, topK: Int = 10): List<RagHit> = withContext(Dispatchers.Default) {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isEmpty()) {
             logger.warn("⚠️ Пустой запрос к RAG-поиску")

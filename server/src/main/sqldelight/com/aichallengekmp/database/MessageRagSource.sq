@@ -1,0 +1,24 @@
+-- Таблица для хранения источников RAG, использованных в ответах
+CREATE TABLE MessageRagSource (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    messageId TEXT NOT NULL,
+    sourceId TEXT NOT NULL,
+    chunkIndex INTEGER NOT NULL,
+    score REAL NOT NULL,
+    chunkText TEXT NOT NULL,
+    FOREIGN KEY (messageId) REFERENCES Message(id) ON DELETE CASCADE
+);
+
+-- Индекс для быстрого поиска по messageId
+CREATE INDEX messageRagSource_messageId ON MessageRagSource(messageId);
+
+-- Queries
+selectByMessageId:
+SELECT * FROM MessageRagSource WHERE messageId = ? ORDER BY score DESC;
+
+insertSource:
+INSERT INTO MessageRagSource(messageId, sourceId, chunkIndex, score, chunkText)
+VALUES (?, ?, ?, ?, ?);
+
+deleteByMessageId:
+DELETE FROM MessageRagSource WHERE messageId = ?;

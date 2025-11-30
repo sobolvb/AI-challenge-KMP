@@ -43,6 +43,14 @@ data class SessionDetailResponse(
 )
 
 @Serializable
+data class RagSourceDto(
+    val sourceId: String,
+    val chunkIndex: Int,
+    val score: Double,
+    val chunkText: String
+)
+
+@Serializable
 data class MessageDto(
     val id: String,
     val role: String, // "user" or "assistant"
@@ -50,7 +58,8 @@ data class MessageDto(
     val modelId: String?,
     val modelName: String?,
     val tokenUsage: TokenUsageDto?,
-    val timestamp: Long
+    val timestamp: Long,
+    val ragSources: List<RagSourceDto>? = null
 )
 
 @Serializable

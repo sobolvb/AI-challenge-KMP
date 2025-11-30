@@ -81,13 +81,14 @@ object AppContainer {
     }
     
     // ============= DAOs =============
-    
+
     val sessionDao by lazy { SessionDao(database) }
     val messageDao by lazy { MessageDao(database) }
     val sessionSettingsDao by lazy { SessionSettingsDao(database) }
     val compressionDao by lazy { CompressionDao(database) }
     val reminderDao by lazy { ReminderDao(database) }
     val ragChunkDao by lazy { RagChunkDao(database) }
+    val ragSourceDao by lazy { RagSourceDao(database) }
     
     // ============= RAG / Embeddings =============
 
@@ -208,7 +209,9 @@ object AppContainer {
             settingsDao = sessionSettingsDao,
             compressionService = compressionService,
             modelRegistry = modelRegistry,
-            trackerTools = trackerTools
+            trackerTools = trackerTools,
+            ragSearchService = ragSearchService,
+            ragSourceDao = ragSourceDao
         )
     }
 }

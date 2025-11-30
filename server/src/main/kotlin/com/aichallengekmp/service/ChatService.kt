@@ -20,9 +20,18 @@ class ChatService(
     private val settingsDao: SessionSettingsDao,
     private val compressionService: CompressionService,
     private val modelRegistry: ModelRegistry,
-    private val trackerTools: TrackerToolsService
+    private val trackerTools: TrackerToolsService,
+    private val ragSearchService: com.aichallengekmp.rag.RagSearchService,
+    private val ragSourceDao: RagSourceDao
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
+
+    // Порог similarity для фильтрации RAG результатов (0.0 - 1.0)
+    // 0.4 - баланс между релевантностью и охватом
+    private val ragSimilarityThreshold = 0.4
+
+    // Количество чанков для поиска
+    private val ragTopK = 5
     
     /**
      * Создать новую сессию с первым сообщением
@@ -50,7 +59,7 @@ class ChatService(
         settingsDao.insert(dbSettings)
         
         logger.info("💬 Отправка первого сообщения в сессию")
-        
+
         // Добавляем сообщение пользователя
         val userMessage = Message(
             id = UUID.randomUUID().toString(),
@@ -63,22 +72,60 @@ class ChatService(
             createdAt = now
         )
         messageDao.insert(userMessage)
-        
-        // Получаем ответ от AI (с поддержкой инструментов)
-        val aiResponse = generateResponseWithTools(sessionId, settings, listOf(userMessage))
-        
+
+        // === АВТОМАТИЧЕСКИЙ ПОИСК RAG ===
+        logger.info("🔎 Выполняем RAG-поиск для первого сообщения: ${initialMessage.take(50)}...")
+        val ragHits = try {
+            ragSearchService.search(initialMessage, topK = ragTopK)
+        } catch (e: Exception) {
+            logger.warn("⚠️ Ошибка при поиске RAG: ${e.message}")
+            emptyList()
+        }
+
+        // Фильтруем по порогу similarity
+        val filteredHits = ragHits.filter { it.score >= ragSimilarityThreshold }
+        logger.info("📊 RAG: найдено ${ragHits.size} чанков, после фильтрации (threshold=$ragSimilarityThreshold): ${filteredHits.size}")
+        filteredHits.forEachIndexed { idx, hit ->
+            logger.info("  [$idx] ${hit.sourceId}#${hit.chunkIndex} (score=${String.format("%.3f", hit.score)}): ${hit.text.take(80)}...")
+        }
+
+        // Получаем ответ от AI (с поддержкой инструментов и RAG-контекстом)
+        val aiResponse = generateResponseWithTools(
+            sessionId = sessionId,
+            settings = settings,
+            messages = listOf(userMessage),
+            ragContext = buildRagContext(filteredHits)
+        )
+
+        // Используем ответ как есть - источники будут видны в UI, но не в тексте
+        val finalContent = aiResponse.text
+
         // Добавляем ответ AI
         val assistantMessage = Message(
             id = UUID.randomUUID().toString(),
             sessionId = sessionId,
             role = "assistant",
-            content = aiResponse.text,
+            content = finalContent,
             modelId = aiResponse.modelId,
             inputTokens = aiResponse.tokenUsage.inputTokens.toLong(),
             outputTokens = aiResponse.tokenUsage.outputTokens.toLong(),
             createdAt = System.currentTimeMillis()
         )
         messageDao.insert(assistantMessage)
+
+        // Сохраняем источники RAG в базу
+        if (filteredHits.isNotEmpty()) {
+            logger.info("💾 Сохраняем ${filteredHits.size} источников RAG для сообщения ${assistantMessage.id}")
+            val ragSources = filteredHits.map { hit ->
+                RagSourceDao.RagSourceInfo(
+                    sourceId = hit.sourceId,
+                    chunkIndex = hit.chunkIndex.toLong(),
+                    score = hit.score,
+                    chunkText = hit.text
+                )
+            }
+            ragSourceDao.insertBatch(assistantMessage.id, ragSources)
+        }
         
         // Генерируем умное название на основе диалога
         generateSessionName(sessionId, initialMessage, aiResponse.text, settings.modelId)
@@ -96,16 +143,16 @@ class ChatService(
      */
     suspend fun sendMessage(sessionId: String, messageText: String): SessionDetailResponse {
         logger.info("💬 Отправка сообщения в сессию: $sessionId")
-        
+
         // Проверяем что сессия существует
         sessionDao.getById(sessionId)
             ?: throw NotFoundException("Сессия не найдена: $sessionId")
-        
+
         val settings = settingsDao.getBySessionId(sessionId)
             ?: throw NotFoundException("Настройки сессии не найдены: $sessionId")
-        
+
         val now = System.currentTimeMillis()
-        
+
         // Добавляем сообщение пользователя
         val userMessage = Message(
             id = UUID.randomUUID().toString(),
@@ -118,38 +165,76 @@ class ChatService(
             createdAt = now
         )
         messageDao.insert(userMessage)
-        
+
+        // === АВТОМАТИЧЕСКИЙ ПОИСК RAG ===
+        logger.info("🔎 Выполняем RAG-поиск для сообщения: ${messageText.take(50)}...")
+        val ragHits = try {
+            ragSearchService.search(messageText, topK = ragTopK)
+        } catch (e: Exception) {
+            logger.warn("⚠️ Ошибка при поиске RAG: ${e.message}")
+            emptyList()
+        }
+
+        // Фильтруем по порогу similarity
+        val filteredHits = ragHits.filter { it.score >= ragSimilarityThreshold }
+        logger.info("📊 RAG: найдено ${ragHits.size} чанков, после фильтрации (threshold=$ragSimilarityThreshold): ${filteredHits.size}")
+        filteredHits.forEachIndexed { idx, hit ->
+            logger.info("  [$idx] ${hit.sourceId}#${hit.chunkIndex} (score=${String.format("%.3f", hit.score)}): ${hit.text.take(80)}...")
+        }
+
         // Проверяем нужно ли сжатие
         val shouldCompress = compressionService.shouldCompress(sessionId, settings.compressionThreshold)
         if (shouldCompress) {
             logger.info("📦 Запуск сжатия истории для сессии: $sessionId")
             compressionService.compressHistory(sessionId, settings.toDto())
         }
-        
+
         // Получаем контекст для AI (с учетом сжатия)
         val contextMessages = compressionService.getContextForAI(sessionId)
-        
-        // Получаем ответ от AI (с поддержкой инструментов)
-        val aiResponse = generateResponseWithTools(sessionId, settings.toDto(), contextMessages)
-        
+
+        // Получаем ответ от AI (с поддержкой инструментов и RAG-контекстом)
+        val aiResponse = generateResponseWithTools(
+            sessionId = sessionId,
+            settings = settings.toDto(),
+            messages = contextMessages,
+            ragContext = buildRagContext(filteredHits)
+        )
+
+        // Используем ответ как есть - источники будут видны в UI, но не в тексте
+        val finalContent = aiResponse.text
+
         // Добавляем ответ AI
         val assistantMessage = Message(
             id = UUID.randomUUID().toString(),
             sessionId = sessionId,
             role = "assistant",
-            content = aiResponse.text,
+            content = finalContent,
             modelId = aiResponse.modelId,
             inputTokens = aiResponse.tokenUsage.inputTokens.toLong(),
             outputTokens = aiResponse.tokenUsage.outputTokens.toLong(),
             createdAt = System.currentTimeMillis()
         )
         messageDao.insert(assistantMessage)
-        
+
+        // Сохраняем источники RAG в базу
+        if (filteredHits.isNotEmpty()) {
+            logger.info("💾 Сохраняем ${filteredHits.size} источников RAG для сообщения ${assistantMessage.id}")
+            val ragSources = filteredHits.map { hit ->
+                RagSourceDao.RagSourceInfo(
+                    sourceId = hit.sourceId,
+                    chunkIndex = hit.chunkIndex.toLong(),
+                    score = hit.score,
+                    chunkText = hit.text
+                )
+            }
+            ragSourceDao.insertBatch(assistantMessage.id, ragSources)
+        }
+
         // Обновляем timestamp сессии
         sessionDao.updateTimestamp(sessionId, System.currentTimeMillis())
-        
+
         logger.info("✅ Сообщение обработано успешно")
-        
+
         return getSessionDetail(sessionId)
     }
     
@@ -180,18 +265,18 @@ class ChatService(
      */
     suspend fun getSessionDetail(sessionId: String): SessionDetailResponse {
         logger.debug("🔍 Запрос деталей сессии: $sessionId")
-        
+
         val session = sessionDao.getById(sessionId)
             ?: throw NotFoundException("Сессия не найдена: $sessionId")
-        
+
         val settings = settingsDao.getBySessionId(sessionId)
             ?: throw NotFoundException("Настройки сессии не найдены: $sessionId")
-        
+
         val messages = messageDao.getBySessionId(sessionId)
         val compressionInfo = compressionService.getCompressionInfo(sessionId)
-        
-        val messageDtos = messages.map { it.toDto() }
-        
+
+        val messageDtos = messages.map { it.toDto(ragSourceDao) }
+
         return SessionDetailResponse(
             id = session.id,
             name = session.name,
@@ -253,16 +338,38 @@ class ChatService(
     }
     
     // ============= Private Helper Methods =============
-    
+
+    /**
+     * Строит контекст из RAG hits для добавления в системный промпт
+     */
+    private fun buildRagContext(hits: List<com.aichallengekmp.rag.RagHit>): String {
+        if (hits.isEmpty()) return ""
+
+        return buildString {
+            appendLine("=== КОНТЕКСТ ИЗ ДОКУМЕНТАЦИИ ПРОЕКТА ===")
+            appendLine()
+            appendLine("Ниже приведена информация из локальной документации проекта.")
+            appendLine("Используй эти фрагменты ТОЛЬКО если они ДЕЙСТВИТЕЛЬНО релевантны вопросу пользователя о проекте.")
+            appendLine("Если вопрос НЕ связан с проектом (погода, общие знания и т.д.) - полностью ИГНОРИРУЙ эти фрагменты и отвечай на основе своих знаний.")
+            appendLine()
+            hits.forEachIndexed { index, hit ->
+                appendLine("Фрагмент ${index + 1} (${hit.sourceId}#${hit.chunkIndex}):")
+                appendLine(hit.text.trim())
+                appendLine()
+            }
+            appendLine("=== КОНЕЦ КОНТЕКСТА ===")
+        }
+    }
+
     /**
      * Базовый system prompt для агента, который умеет работать с задачами и напоминаниями
      * через инструменты, но при этом ведёт себя как обычный чат-ассистент.
      */
     private val defaultAgentSystemPrompt: String = """
-        Ты — умный помощник, который общается с пользователем на естественном языке и
-        при необходимости умеет вызывать специальные инструменты.
-        
-        У тебя есть следующие инструменты:
+        Ты — умный помощник, который общается с пользователем на естественном языке.
+        Ты можешь отвечать на ЛЮБЫЕ вопросы, используя свои знания.
+
+        При необходимости ты также умеешь вызывать специальные инструменты:
         - get_issues_count: получить количество задач в трекере.
         - get_all_issue_names: получить список задач с их ключами и названиями.
         - get_issue_info: получить подробную информацию о задаче по ключу.
@@ -270,11 +377,10 @@ class ChatService(
         - create_reminder: создать новое напоминание на указанное время.
         - delete_reminder: удалить существующее напоминание.
         - search_docs: выполнить поиск по локальному индексу документации проекта и вернуть релевантные фрагменты.
-        
+
         Общие правила:
-        - Веди себя как обычный диалоговый помощник: отвечай понятно, дружелюбно и по делу.
-        - Если вопрос пользователя связан с документацией проекта, файлами README или описанием архитектуры,
-          сначала попробуй вызвать инструмент search_docs, а затем на основе найденных фрагментов сформируй ответ.
+        - Отвечай на ЛЮБЫЕ вопросы пользователя на основе своих знаний.
+        - Если в начале сообщения есть "КОНТЕКСТ ИЗ ДОКУМЕНТАЦИИ ПРОЕКТА" - используй его для ответов о проекте.
         - Если пользователь просит разобраться с задачами, сделать сводку или проверить напоминания,
           используй инструменты, чтобы сначала собрать нужные данные, а затем сформировать ответ.
         - Если нужно понять, есть ли напоминание про важную задачу, сначала получи список задач
@@ -297,27 +403,38 @@ class ChatService(
     private suspend fun generateResponseWithTools(
         sessionId: String,
         settings: SessionSettingsDto,
-        messages: List<Message>
+        messages: List<Message>,
+        ragContext: String = ""
     ): CompletionResult {
         logger.debug("🤖 Генерация ответа AI с инструментами для сессии: $sessionId")
-        
+
         val aiMessages = messages.map { msg ->
             AIMessage(role = msg.role, content = msg.content)
         }
-        
+
         // Получаем доступные инструменты
         val availableTools = trackerTools.getAvailableTools()
         logger.info("🔧 Передаем YandexGPT ${availableTools.size} инструментов")
-        
-        // Строим итоговый system prompt: всегда включаем агентный, а пользовательские инструкции добавляем сверху
+
+        // Строим итоговый system prompt: RAG-контекст в НАЧАЛЕ (самое важное), потом основной промпт
         val effectiveSystemPrompt = buildString {
+            // Добавляем RAG-контекст ПЕРВЫМ, если есть
+            if (ragContext.isNotBlank()) {
+                append(ragContext)
+                append("\n\n")
+                logger.info("📖 RAG-контекст добавлен В НАЧАЛО системного промпта (${ragContext.length} символов)")
+            } else {
+                logger.warn("⚠️ RAG-контекст пустой, ничего не добавлено в промпт")
+            }
+
             append(defaultAgentSystemPrompt)
+
             settings.systemPrompt?.takeIf { it.isNotBlank() }?.let { userPrompt ->
                 append("\n\nДополнительные инструкции пользователя:\n")
                 append(userPrompt)
             }
         }
-        
+
         val request = CompletionRequest(
             modelId = settings.modelId,
             messages = aiMessages,
@@ -326,7 +443,7 @@ class ChatService(
             systemPrompt = effectiveSystemPrompt,
             tools = availableTools  // YandexGPT сам решит какие вызвать и как построить цепочку
         )
-        
+
         return modelRegistry.complete(request)
     }
     
@@ -390,7 +507,26 @@ private fun SessionSettingsDto.toDbModel(sessionId: String) = SessionSettings(
     systemPrompt = systemPrompt
 )
 
-private suspend fun Message.toDto(): MessageDto {
+private suspend fun Message.toDto(ragSourceDao: RagSourceDao): MessageDto {
+    // Загружаем источники RAG для этого сообщения
+    val ragSources = if (role == "assistant") {
+        try {
+            val sources = ragSourceDao.getByMessageId(id)
+            sources.map { source ->
+                RagSourceDto(
+                    sourceId = source.sourceId,
+                    chunkIndex = source.chunkIndex.toInt(),
+                    score = source.score,
+                    chunkText = source.chunkText
+                )
+            }.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            null
+        }
+    } else {
+        null
+    }
+
     return MessageDto(
         id = id,
         role = role,
@@ -404,7 +540,8 @@ private suspend fun Message.toDto(): MessageDto {
                 totalTokens = (inputTokens + outputTokens).toInt()
             )
         } else null,
-        timestamp = createdAt
+        timestamp = createdAt,
+        ragSources = ragSources
     )
 }
 

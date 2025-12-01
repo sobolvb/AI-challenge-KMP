@@ -125,6 +125,14 @@ object AppContainer {
     }
 
     /**
+     * Git инструменты
+     */
+    val gitTools by lazy {
+        logger.info("🔧 Инициализация GitToolsService")
+        com.aichallengekmp.tools.GitToolsService()
+    }
+
+    /**
      * MCP-клиенты к внешним MCP-серверам (tracker, reminders, ...).
      * Могут быть отключены через конфиг (feature-флаги).
      */
@@ -211,7 +219,8 @@ object AppContainer {
             modelRegistry = modelRegistry,
             trackerTools = trackerTools,
             ragSearchService = ragSearchService,
-            ragSourceDao = ragSourceDao
+            ragSourceDao = ragSourceDao,
+            gitTools = gitTools
         )
     }
 }

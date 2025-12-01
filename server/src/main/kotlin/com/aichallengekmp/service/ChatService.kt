@@ -22,13 +22,14 @@ class ChatService(
     private val modelRegistry: ModelRegistry,
     private val trackerTools: TrackerToolsService,
     private val ragSearchService: com.aichallengekmp.rag.RagSearchService,
-    private val ragSourceDao: RagSourceDao
+    private val ragSourceDao: RagSourceDao,
+    private val gitTools: com.aichallengekmp.tools.GitToolsService
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
 
     // Порог similarity для фильтрации RAG результатов (0.0 - 1.0)
-    // 0.4 - баланс между релевантностью и охватом
-    private val ragSimilarityThreshold = 0.4
+    // 0.5 - достаточно высокий порог чтобы отсеять нерелевантные фрагменты
+    private val ragSimilarityThreshold = 0.5
 
     // Количество чанков для поиска
     private val ragTopK = 5
@@ -150,6 +151,12 @@ class ChatService(
 
         val settings = settingsDao.getBySessionId(sessionId)
             ?: throw NotFoundException("Настройки сессии не найдены: $sessionId")
+
+        // === ПРОВЕРКА НА SLASH КОМАНДУ ===
+        if (messageText.trim().startsWith("/")) {
+            logger.info("🔨 Обнаружена slash команда: ${messageText.take(20)}")
+            return handleCommand(sessionId, messageText.trim(), settings.toDto())
+        }
 
         val now = System.currentTimeMillis()
 
@@ -346,18 +353,25 @@ class ChatService(
         if (hits.isEmpty()) return ""
 
         return buildString {
-            appendLine("=== КОНТЕКСТ ИЗ ДОКУМЕНТАЦИИ ПРОЕКТА ===")
+            appendLine("=== ДОПОЛНИТЕЛЬНАЯ СПРАВОЧНАЯ ИНФОРМАЦИЯ ===")
             appendLine()
-            appendLine("Ниже приведена информация из локальной документации проекта.")
-            appendLine("Используй эти фрагменты ТОЛЬКО если они ДЕЙСТВИТЕЛЬНО релевантны вопросу пользователя о проекте.")
-            appendLine("Если вопрос НЕ связан с проектом (погода, общие знания и т.д.) - полностью ИГНОРИРУЙ эти фрагменты и отвечай на основе своих знаний.")
+            appendLine("Ниже приведены фрагменты из документации проекта, найденные автоматически.")
+            appendLine()
+            appendLine("ВАЖНО:")
+            appendLine("- Эти фрагменты могут быть НЕ релевантны текущему вопросу")
+            appendLine("- Если вопрос о погоде, общих знаниях, науке и т.д. - ИГНОРИРУЙ эти фрагменты ПОЛНОСТЬЮ")
+            appendLine("- Отвечай на вопрос используя СВОИ знания")
+            appendLine("- Используй фрагменты ТОЛЬКО если вопрос явно про этот конкретный проект/код")
+            appendLine("- НЕ говори 'К сожалению, у меня нет доступа' если можешь ответить сам")
             appendLine()
             hits.forEachIndexed { index, hit ->
-                appendLine("Фрагмент ${index + 1} (${hit.sourceId}#${hit.chunkIndex}):")
+                appendLine("Фрагмент ${index + 1} (${hit.sourceId}#${hit.chunkIndex}, score=${String.format("%.2f", hit.score)}):")
                 appendLine(hit.text.trim())
                 appendLine()
             }
-            appendLine("=== КОНЕЦ КОНТЕКСТА ===")
+            appendLine("=== КОНЕЦ СПРАВОЧНОЙ ИНФОРМАЦИИ ===")
+            appendLine()
+            appendLine("Повторяю: отвечай на вопрос пользователя используя СВОИ знания. Фрагменты выше - только справка на случай вопроса о проекте.")
         }
     }
 
@@ -367,9 +381,11 @@ class ChatService(
      */
     private val defaultAgentSystemPrompt: String = """
         Ты — умный помощник, который общается с пользователем на естественном языке.
-        Ты можешь отвечать на ЛЮБЫЕ вопросы, используя свои знания.
 
-        При необходимости ты также умеешь вызывать специальные инструменты:
+        ТЫ МОЖЕШЬ ОТВЕЧАТЬ НА ЛЮБЫЕ ВОПРОСЫ: о погоде, науке, программировании, истории, культуре и т.д.
+        Используй свои знания для ответов на общие вопросы.
+
+        Дополнительно ты имеешь доступ к специальным инструментам:
         - get_issues_count: получить количество задач в трекере.
         - get_all_issue_names: получить список задач с их ключами и названиями.
         - get_issue_info: получить подробную информацию о задаче по ключу.
@@ -377,10 +393,12 @@ class ChatService(
         - create_reminder: создать новое напоминание на указанное время.
         - delete_reminder: удалить существующее напоминание.
         - search_docs: выполнить поиск по локальному индексу документации проекта и вернуть релевантные фрагменты.
+        - get_git_branch: получить название текущей git ветки проекта.
 
         Общие правила:
-        - Отвечай на ЛЮБЫЕ вопросы пользователя на основе своих знаний.
-        - Если в начале сообщения есть "КОНТЕКСТ ИЗ ДОКУМЕНТАЦИИ ПРОЕКТА" - используй его для ответов о проекте.
+        - По умолчанию отвечай на вопросы используя СВОИ знания (о мире, науке, программировании и т.д.)
+        - Если в промпте есть "ДОПОЛНИТЕЛЬНАЯ СПРАВОЧНАЯ ИНФОРМАЦИЯ" и вопрос про этот конкретный проект - используй её
+        - Если вопрос НЕ про проект (погода, наука и т.д.) - игнорируй справочную информацию и отвечай сам
         - Если пользователь просит разобраться с задачами, сделать сводку или проверить напоминания,
           используй инструменты, чтобы сначала собрать нужные данные, а затем сформировать ответ.
         - Если нужно понять, есть ли напоминание про важную задачу, сначала получи список задач
@@ -412,8 +430,8 @@ class ChatService(
             AIMessage(role = msg.role, content = msg.content)
         }
 
-        // Получаем доступные инструменты
-        val availableTools = trackerTools.getAvailableTools()
+        // Получаем доступные инструменты из всех источников
+        val availableTools = trackerTools.getAvailableTools() + gitTools.getAvailableTools()
         logger.info("🔧 Передаем YandexGPT ${availableTools.size} инструментов")
 
         // Строим итоговый system prompt: RAG-контекст в НАЧАЛЕ (самое важное), потом основной промпт
@@ -485,6 +503,219 @@ class ChatService(
             logger.error("❌ Ошибка при генерации названия: ${e.message}", e)
             // Не критично, оставляем старое название
         }
+    }
+
+    /**
+     * Обработка slash команд
+     */
+    private suspend fun handleCommand(
+        sessionId: String,
+        command: String,
+        settings: SessionSettingsDto
+    ): SessionDetailResponse {
+        val parts = command.trim().split(" ", limit = 2)
+        val commandName = parts[0].lowercase()
+        val args = parts.getOrNull(1) ?: ""
+
+        logger.info("🔨 Обработка команды: $commandName, аргументы: ${args.take(50)}")
+
+        return when (commandName) {
+            "/help" -> handleHelpCommand(sessionId, args, settings)
+            else -> {
+                // Неизвестная команда - обрабатываем как обычное сообщение
+                logger.warn("⚠️ Неизвестная команда: $commandName, обрабатываем как обычное сообщение")
+
+                // Сохраняем исходное сообщение пользователя
+                val now = System.currentTimeMillis()
+                val userMessage = Message(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    role = "user",
+                    content = command,
+                    modelId = null,
+                    inputTokens = 0,
+                    outputTokens = 0,
+                    createdAt = now
+                )
+                messageDao.insert(userMessage)
+
+                // Создаем ответ о неизвестной команде
+                val responseMessage = Message(
+                    id = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    role = "assistant",
+                    content = "Неизвестная команда: $commandName\n\nДоступные команды:\n- /help <вопрос> - получить помощь по проекту",
+                    modelId = settings.modelId,
+                    inputTokens = 0,
+                    outputTokens = 0,
+                    createdAt = System.currentTimeMillis()
+                )
+                messageDao.insert(responseMessage)
+
+                sessionDao.updateTimestamp(sessionId, System.currentTimeMillis())
+                getSessionDetail(sessionId)
+            }
+        }
+    }
+
+    /**
+     * Команда /help - помощь по проекту на основе документации
+     */
+    private suspend fun handleHelpCommand(
+        sessionId: String,
+        question: String,
+        settings: SessionSettingsDto
+    ): SessionDetailResponse {
+        logger.info("📚 Команда /help: $question")
+
+        val now = System.currentTimeMillis()
+
+        // Сохраняем сообщение пользователя с командой
+        val userMessage = Message(
+            id = UUID.randomUUID().toString(),
+            sessionId = sessionId,
+            role = "user",
+            content = "/help $question",
+            modelId = null,
+            inputTokens = 0,
+            outputTokens = 0,
+            createdAt = now
+        )
+        messageDao.insert(userMessage)
+
+        if (question.isBlank()) {
+            // Если вопрос не указан - показываем справку
+            val helpText = buildString {
+                appendLine("Команда /help используется для получения помощи по проекту на основе локальной документации.")
+                appendLine()
+                appendLine("Использование: /help <ваш вопрос>")
+                appendLine()
+                appendLine("Примеры:")
+                appendLine("- /help как создать новую сессию?")
+                appendLine("- /help какие есть API endpoints?")
+                appendLine("- /help стиль кода для классов")
+                appendLine("- /help как работает RAG?")
+            }
+
+            val responseMessage = Message(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                role = "assistant",
+                content = helpText,
+                modelId = settings.modelId,
+                inputTokens = 0,
+                outputTokens = 0,
+                createdAt = System.currentTimeMillis()
+            )
+            messageDao.insert(responseMessage)
+
+            sessionDao.updateTimestamp(sessionId, System.currentTimeMillis())
+            return getSessionDetail(sessionId)
+        }
+
+        // Выполняем RAG поиск с параметрами для /help
+        val helpRagTopK = 10  // Больше чанков
+        val helpRagThreshold = 0.3  // Более низкий порог
+
+        logger.info("🔎 RAG-поиск для /help (topK=$helpRagTopK, threshold=$helpRagThreshold)")
+        val ragHits = try {
+            ragSearchService.search(question, topK = helpRagTopK)
+        } catch (e: Exception) {
+            logger.warn("⚠️ Ошибка при поиске RAG: ${e.message}")
+            emptyList()
+        }
+
+        val filteredHits = ragHits.filter { it.score >= helpRagThreshold }
+        logger.info("📊 RAG для /help: найдено ${ragHits.size} чанков, после фильтрации: ${filteredHits.size}")
+
+        if (filteredHits.isEmpty()) {
+            val noDocsMessage = Message(
+                id = UUID.randomUUID().toString(),
+                sessionId = sessionId,
+                role = "assistant",
+                content = "К сожалению, в локальной документации не найдено информации по вашему вопросу.\n\nПопробуйте переформулировать вопрос или задать более общий вопрос.",
+                modelId = settings.modelId,
+                inputTokens = 0,
+                outputTokens = 0,
+                createdAt = System.currentTimeMillis()
+            )
+            messageDao.insert(noDocsMessage)
+
+            sessionDao.updateTimestamp(sessionId, System.currentTimeMillis())
+            return getSessionDetail(sessionId)
+        }
+
+        // Формируем специальный system prompt для /help
+        val helpSystemPrompt = buildString {
+            appendLine("=== ДОКУМЕНТАЦИЯ ПРОЕКТА ===")
+            appendLine()
+            appendLine("Ты — ассистент разработчика для проекта AI Challenge KMP.")
+            appendLine("Твоя задача — помогать разработчикам, отвечая на вопросы о проекте на основе предоставленной документации.")
+            appendLine()
+            appendLine("ВАЖНЫЕ ПРАВИЛА:")
+            appendLine("1. Отвечай ТОЛЬКО на основе фрагментов документации ниже")
+            appendLine("2. Если в документации нет ответа на вопрос - честно скажи об этом")
+            appendLine("3. НЕ придумывай информацию, которой нет в документации")
+            appendLine("4. Используй примеры кода из документации если они есть")
+            appendLine("5. Отвечай кратко и по делу")
+            appendLine()
+            appendLine("=== ФРАГМЕНТЫ ДОКУМЕНТАЦИИ ===")
+            appendLine()
+
+            filteredHits.forEachIndexed { index, hit ->
+                appendLine("### Фрагмент ${index + 1} (${hit.sourceId}, score=${String.format("%.2f", hit.score)})")
+                appendLine(hit.text.trim())
+                appendLine()
+            }
+
+            appendLine("=== КОНЕЦ ДОКУМЕНТАЦИИ ===")
+            appendLine()
+            appendLine("Вопрос разработчика: $question")
+        }
+
+        // Генерируем ответ с помощью LLM
+        val request = CompletionRequest(
+            modelId = settings.modelId,
+            messages = listOf(AIMessage(role = "user", content = question)),
+            temperature = settings.temperature,
+            maxTokens = settings.maxTokens,
+            systemPrompt = helpSystemPrompt,
+            tools = null  // Для /help не используем tools
+        )
+
+        val aiResponse = modelRegistry.complete(request)
+
+        // Сохраняем ответ ассистента
+        val assistantMessage = Message(
+            id = UUID.randomUUID().toString(),
+            sessionId = sessionId,
+            role = "assistant",
+            content = aiResponse.text,
+            modelId = aiResponse.modelId,
+            inputTokens = aiResponse.tokenUsage.inputTokens.toLong(),
+            outputTokens = aiResponse.tokenUsage.outputTokens.toLong(),
+            createdAt = System.currentTimeMillis()
+        )
+        messageDao.insert(assistantMessage)
+
+        // Сохраняем источники RAG
+        if (filteredHits.isNotEmpty()) {
+            logger.info("💾 Сохраняем ${filteredHits.size} источников RAG для /help")
+            val ragSources = filteredHits.map { hit ->
+                RagSourceDao.RagSourceInfo(
+                    sourceId = hit.sourceId,
+                    chunkIndex = hit.chunkIndex.toLong(),
+                    score = hit.score,
+                    chunkText = hit.text
+                )
+            }
+            ragSourceDao.insertBatch(assistantMessage.id, ragSources)
+        }
+
+        sessionDao.updateTimestamp(sessionId, System.currentTimeMillis())
+        logger.info("✅ Команда /help обработана успешно")
+
+        return getSessionDetail(sessionId)
     }
 }
 

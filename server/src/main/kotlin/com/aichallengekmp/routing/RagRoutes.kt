@@ -13,6 +13,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.io.File
 
@@ -93,6 +94,105 @@ fun Route.ragRoutes() {
                     mapOf(
                         "status" to "error",
                         "message" to (e.message ?: "Неизвестная ошибка при индексации README.md")
+                    )
+                )
+            }
+        }
+
+        /**
+         * POST /api/rag/index/docs
+         *
+         * Индексирует все .md файлы из папки project/docs.
+         * Путь к папке задаётся относительно модуля server:
+         *  - основной вариант: ../project/docs (из каталога server/ в корень монорепо)
+         */
+        post("/index/docs") {
+            logger.info("📚 POST /api/rag/index/docs — индексация папки project/docs")
+
+            val candidatePaths = listOf(
+                "../project/docs",   // из server/ в корень репозитория
+                "project/docs"       // на случай запуска из корня проекта
+            )
+
+            val docsDir = candidatePaths
+                .map { File(it) }
+                .firstOrNull { it.exists() && it.isDirectory }
+
+            if (docsDir == null) {
+                logger.error("❌ Папка project/docs не найдена ни по одному из путей: {}", candidatePaths)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf(
+                        "status" to "error",
+                        "message" to "Папка project/docs не найдена. Ожидались пути: ${candidatePaths.joinToString()}"
+                    )
+                )
+                return@post
+            }
+
+            try {
+                // Рекурсивно собираем все .md файлы
+                val mdFiles = docsDir.walkTopDown()
+                    .filter { it.isFile && it.extension.lowercase() == "md" }
+                    .toList()
+
+                @Serializable
+                data class IndexedDocResult(val sourceId: String, val chunks: Int)
+
+                @Serializable
+                data class IndexDocsResponse(val status: String, val indexed: List<IndexedDocResult>, val message: String? = null)
+
+                if (mdFiles.isEmpty()) {
+                    logger.warn("⚠️ В папке project/docs не найдено .md файлов")
+                    call.respond(
+                        HttpStatusCode.OK,
+                        IndexDocsResponse(
+                            status = "ok",
+                            indexed = emptyList(),
+                            message = "В папке project/docs не найдено .md файлов"
+                        )
+                    )
+                    return@post
+                }
+
+                logger.info("📂 Найдено {} .md файлов для индексации", mdFiles.size)
+
+                val indexedResults = mdFiles.map { file ->
+                    val relativePath = file.relativeTo(docsDir.parentFile).path
+                    val sourceId = "docs/${file.nameWithoutExtension}"
+
+                    logger.info("  📄 Индексируем: $relativePath -> $sourceId")
+
+                    val text = file.readText()
+                    AppContainer.ragIndexService.indexDocument(sourceId, text)
+
+                    // Подсчёт количества чанков этого документа в индексе
+                    val totalChunks = AppContainer.ragChunkDao
+                        .getAllChunks()
+                        .count { it.sourceId == sourceId }
+
+                    IndexedDocResult(
+                        sourceId = sourceId,
+                        chunks = totalChunks
+                    )
+                }
+
+                logger.info("✅ Индексация завершена. Проиндексировано файлов: {}", indexedResults.size)
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    IndexDocsResponse(
+                        status = "ok",
+                        indexed = indexedResults
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("❌ Ошибка при индексации project/docs: {}", e.message, e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf(
+                        "status" to "error",
+                        "message" to (e.message ?: "Неизвестная ошибка при индексации project/docs")
                     )
                 )
             }

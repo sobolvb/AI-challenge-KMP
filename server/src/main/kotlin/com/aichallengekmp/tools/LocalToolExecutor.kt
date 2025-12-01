@@ -130,6 +130,11 @@ class LocalToolExecutor(
                     }
                 }
 
+                "get_git_branch" -> {
+                    // Делегируем выполнение в GitToolsService
+                    AppContainer.gitTools.executeTool(toolName, arguments.filterValues { it != null } as Map<String, Any>)
+                }
+
                 else -> "Неизвестный инструмент (локальный): $toolName"
             }
         } catch (e: Exception) {

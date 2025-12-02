@@ -425,3 +425,181 @@ fun Application.configureRemindersMcpServer(
 
     return mcpServer
 }
+
+/**
+ * MCP сервер для Git/GitHub.
+ * Эндпоинт: /mcp/git
+ */
+fun Application.configureGitMcpServer(
+    gitTools: com.aichallengekmp.tools.GitToolsService
+): Server {
+    val logger = LoggerFactory.getLogger("GitMcpServer")
+
+    val mcpServer = Server(
+        serverInfo = Implementation("git-mcp", "1.0.0"),
+        options = ServerOptions(
+            capabilities = ServerCapabilities(
+                tools = ServerCapabilities.Tools(listChanged = null),
+                prompts = null,
+                resources = null
+            )
+        )
+    )
+
+    try {
+        logger.info("🔧 Регистрация MCP инструментов для Git/GitHub...")
+
+        // Инструмент: Получить diff PR
+        mcpServer.addTool(
+            name = "git_get_pr_diff",
+            description = "Получить diff изменений Pull Request по номеру PR",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("pr_number", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Номер Pull Request")
+                    })
+                    put("repository", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Репозиторий в формате owner/repo (опционально, по умолчанию из текущего репозитория)")
+                    })
+                },
+                required = listOf("pr_number")
+            ),
+            handler = { arguments ->
+                val prNumber = arguments.arguments["pr_number"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'pr_number'"))
+                    )
+                val repository = arguments.arguments["repository"]?.jsonPrimitive?.content
+
+                val result = gitTools.executeTool(
+                    toolName = "git_get_pr_diff",
+                    arguments = buildMap {
+                        put("pr_number", prNumber)
+                        repository?.let { put("repository", it) }
+                    }
+                )
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Получить список измененных файлов
+        mcpServer.addTool(
+            name = "git_get_changed_files",
+            description = "Получить список файлов, измененных в Pull Request",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("pr_number", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Номер Pull Request")
+                    })
+                    put("repository", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Репозиторий в формате owner/repo (опционально)")
+                    })
+                },
+                required = listOf("pr_number")
+            ),
+            handler = { arguments ->
+                val prNumber = arguments.arguments["pr_number"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'pr_number'"))
+                    )
+                val repository = arguments.arguments["repository"]?.jsonPrimitive?.content
+
+                val result = gitTools.executeTool(
+                    toolName = "git_get_changed_files",
+                    arguments = buildMap {
+                        put("pr_number", prNumber)
+                        repository?.let { put("repository", it) }
+                    }
+                )
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Получить содержимое файла
+        mcpServer.addTool(
+            name = "git_get_file_content",
+            description = "Получить содержимое конкретного файла из репозитория",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("file_path", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Путь к файлу в репозитории")
+                    })
+                    put("ref", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Ветка или коммит (опционально, по умолчанию HEAD)")
+                    })
+                },
+                required = listOf("file_path")
+            ),
+            handler = { arguments ->
+                val filePath = arguments.arguments["file_path"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'file_path'"))
+                    )
+                val ref = arguments.arguments["ref"]?.jsonPrimitive?.content
+
+                val result = gitTools.executeTool(
+                    toolName = "git_get_file_content",
+                    arguments = buildMap {
+                        put("file_path", filePath)
+                        ref?.let { put("ref", it) }
+                    }
+                )
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Получить информацию о PR
+        mcpServer.addTool(
+            name = "github_get_pr_info",
+            description = "Получить метаданные Pull Request (заголовок, описание, автор, статус)",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("pr_number", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Номер Pull Request")
+                    })
+                    put("repository", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Репозиторий в формате owner/repo (опционально)")
+                    })
+                },
+                required = listOf("pr_number")
+            ),
+            handler = { arguments ->
+                val prNumber = arguments.arguments["pr_number"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'pr_number'"))
+                    )
+                val repository = arguments.arguments["repository"]?.jsonPrimitive?.content
+
+                val result = gitTools.executeTool(
+                    toolName = "github_get_pr_info",
+                    arguments = buildMap {
+                        put("pr_number", prNumber)
+                        repository?.let { put("repository", it) }
+                    }
+                )
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        logger.info("✅ MCP инструменты Git/GitHub зарегистрированы")
+
+    } catch (e: Exception) {
+        logger.error("❌ Ошибка регистрации MCP инструментов Git/GitHub: ${e.message}", e)
+    }
+
+    routing {
+        mcp("/mcp/git") { mcpServer }
+    }
+
+    logger.info("🚀 Git MCP сервер запущен на /mcp/git")
+
+    return mcpServer
+}

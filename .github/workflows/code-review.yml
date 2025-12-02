@@ -1,0 +1,127 @@
+name: AI Code Review
+
+# Триггер на открытие и обновление PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  ai-code-review:
+    runs-on: ubuntu-latest
+    name: AI Code Review
+
+    # Необходимые разрешения для создания комментариев в PR
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Call Code Review API
+        id: review
+        run: |
+          # Вызов API для анализа PR
+          RESPONSE=$(curl -X POST "${{ secrets.CODE_REVIEW_SERVER_URL }}/api/code-review/analyze" \
+            -H "Content-Type: application/json" \
+            -d "{\"prNumber\": \"${{ github.event.pull_request.number }}\", \"repository\": \"${{ github.repository }}\"}" \
+            -s -w "\n%{http_code}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Error: API returned HTTP $HTTP_CODE"
+            echo "$BODY"
+            exit 1
+          fi
+
+          # Сохраняем результат для следующего шага
+          echo "$BODY" > review_result.json
+
+      - name: Parse Review Result
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reviewData = JSON.parse(fs.readFileSync('review_result.json', 'utf8'));
+
+            // Формируем комментарий для PR
+            let comment = '## 🤖 AI Code Review\\n\\n';
+
+            // Общая оценка
+            comment += '### 📋 Общая оценка\\n';
+            comment += reviewData.summary + '\\n\\n';
+
+            // Критические проблемы
+            if (reviewData.criticalIssues && reviewData.criticalIssues.length > 0) {
+              comment += '### 🚨 Критические проблемы\\n';
+              reviewData.criticalIssues.forEach(issue => {
+                if (issue.file && issue.line) {
+                  comment += `- **${issue.file}:${issue.line}**: ${issue.description}\\n`;
+                } else {
+                  comment += `- ${issue.description}\\n`;
+                }
+              });
+              comment += '\\n';
+            }
+
+            // Предупреждения
+            if (reviewData.warnings && reviewData.warnings.length > 0) {
+              comment += '### ⚠️ Предупреждения\\n';
+              reviewData.warnings.forEach(issue => {
+                if (issue.file && issue.line) {
+                  comment += `- **${issue.file}:${issue.line}**: ${issue.description}\\n`;
+                } else {
+                  comment += `- ${issue.description}\\n`;
+                }
+              });
+              comment += '\\n';
+            }
+
+            // Рекомендации
+            if (reviewData.suggestions && reviewData.suggestions.length > 0) {
+              comment += '### 💡 Рекомендации\\n';
+              reviewData.suggestions.forEach(issue => {
+                if (issue.file && issue.line) {
+                  comment += `- **${issue.file}:${issue.line}**: ${issue.description}\\n`;
+                } else {
+                  comment += `- ${issue.description}\\n`;
+                }
+              });
+              comment += '\\n';
+            }
+
+            // Использованные источники
+            if (reviewData.usedSources && reviewData.usedSources.length > 0) {
+              comment += '### 📚 Использованные источники\\n';
+              reviewData.usedSources.forEach(source => {
+                comment += `- \`${source}\`\\n`;
+              });
+              comment += '\\n';
+            }
+
+            comment += '---\\n';
+            comment += '_Это автоматическое ревью сгенерировано YandexGPT с использованием RAG и MCP_';
+
+            return comment;
+
+      - name: Post Review Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = ${{ steps.parse.outputs.result }};
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });

@@ -129,7 +129,10 @@ object AppContainer {
      */
     val gitTools by lazy {
         logger.info("🔧 Инициализация GitToolsService")
-        com.aichallengekmp.tools.GitToolsService()
+        com.aichallengekmp.tools.GitToolsService(
+            httpClient = httpClient,
+            workingDirectory = System.getProperty("user.dir")
+        )
     }
 
     /**
@@ -221,6 +224,15 @@ object AppContainer {
             ragSearchService = ragSearchService,
             ragSourceDao = ragSourceDao,
             gitTools = gitTools
+        )
+    }
+
+    val codeReviewService by lazy {
+        logger.info("🔍 Инициализация CodeReviewService")
+        com.aichallengekmp.service.CodeReviewService(
+            gitTools = gitTools,
+            ragSearchService = ragSearchService,
+            modelRegistry = modelRegistry
         )
     }
 }

@@ -10,6 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     name: AI Code Review
 
+    # Необходимые разрешения для создания комментариев в PR
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

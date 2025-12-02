@@ -76,7 +76,7 @@ class CodeReviewService(
 
         // 8. Вызов YandexGPT с низкой temperature для консистентности
         val request = CompletionRequest(
-            modelId = "yandex-gpt",
+            modelId = "yandexgpt-lite",
             messages = listOf(
                 AIMessage(role = "user", content = userPrompt)
             ),

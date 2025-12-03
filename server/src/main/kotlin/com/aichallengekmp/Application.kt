@@ -4,10 +4,12 @@ import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.routing.chatRoutes
 import com.aichallengekmp.routing.ragRoutes
 import com.aichallengekmp.routing.codeReviewRoutes
+import com.aichallengekmp.routing.supportRoutes
 import com.aichallengekmp.mcp.configureMcpServer
 import com.aichallengekmp.mcp.configureTrackerMcpServer
 import com.aichallengekmp.mcp.configureRemindersMcpServer
 import com.aichallengekmp.mcp.configureGitMcpServer
+import com.aichallengekmp.mcp.configureSupportMcpServer
 import com.aichallengekmp.scheduler.ReminderScheduler
 import com.aichallengekmp.scheduler.ReminderNotifications
 import io.ktor.serialization.kotlinx.json.*
@@ -73,6 +75,11 @@ fun Application.module() {
         gitTools = AppContainer.gitTools
     )
 
+    // Отдельный MCP сервер для системы поддержки
+    configureSupportMcpServer(
+        supportTools = AppContainer.supportTools
+    )
+
     // Фоновый планировщик напоминаний, работает 24/7 после старта сервера
     ReminderScheduler(
         reminderService = AppContainer.reminderService,
@@ -122,6 +129,7 @@ fun Application.module() {
             chatRoutes()
             ragRoutes()
             codeReviewRoutes()
+            supportRoutes()
 
             // SSE-стрим с напоминаниями для клиента KMP (Ktor 3.x API)
             sse("/reminders/stream") {

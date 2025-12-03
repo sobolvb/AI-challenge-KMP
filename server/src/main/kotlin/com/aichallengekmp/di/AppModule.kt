@@ -235,6 +235,28 @@ object AppContainer {
             modelRegistry = modelRegistry
         )
     }
+
+    /**
+     * Support инструменты для системы поддержки
+     */
+    val supportTools by lazy {
+        logger.info("💬 Инициализация SupportToolsService")
+        com.aichallengekmp.tools.SupportToolsService(
+            dataFilePath = "server/src/main/resources/support-data.json"
+        )
+    }
+
+    /**
+     * Ассистент поддержки (MCP + RAG + AI)
+     */
+    val supportAssistantService by lazy {
+        logger.info("🤝 Инициализация SupportAssistantService")
+        com.aichallengekmp.service.SupportAssistantService(
+            supportTools = supportTools,
+            ragSearchService = ragSearchService,
+            modelRegistry = modelRegistry
+        )
+    }
 }
 
 

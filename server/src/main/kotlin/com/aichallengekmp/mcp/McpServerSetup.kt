@@ -8,6 +8,7 @@ import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.mcp
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
@@ -600,6 +601,201 @@ fun Application.configureGitMcpServer(
     }
 
     logger.info("🚀 Git MCP сервер запущен на /mcp/git")
+
+    return mcpServer
+}
+
+/**
+ * Настройка Support MCP сервера для системы поддержки
+ */
+fun Application.configureSupportMcpServer(
+    supportTools: com.aichallengekmp.tools.SupportToolsService
+): Server {
+    val logger = LoggerFactory.getLogger("SupportMcpServer")
+
+    val mcpServer = Server(
+        serverInfo = Implementation("support-mcp", "1.0.0"),
+        options = ServerOptions(
+            capabilities = ServerCapabilities(
+                tools = ServerCapabilities.Tools(listChanged = null),
+                prompts = null,
+                resources = null
+            )
+        )
+    )
+
+    try {
+        logger.info("🔧 Регистрация MCP инструментов для системы поддержки...")
+
+        // Инструмент: Получить информацию о пользователе
+        mcpServer.addTool(
+            name = "get_user",
+            description = "Получить информацию о пользователе по ID",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("user_id", buildJsonObject {
+                        put("type", "string")
+                        put("description", "ID пользователя")
+                    })
+                },
+                required = listOf("user_id")
+            ),
+            handler = { arguments ->
+                val userId = arguments.arguments["user_id"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'user_id'"))
+                    )
+
+                val result = runBlocking {
+                    supportTools.executeTool(
+                        toolName = "get_user",
+                        arguments = mapOf("user_id" to userId)
+                    )
+                }
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Получить тикеты пользователя
+        mcpServer.addTool(
+            name = "get_user_tickets",
+            description = "Получить список всех тикетов пользователя",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("user_id", buildJsonObject {
+                        put("type", "string")
+                        put("description", "ID пользователя")
+                    })
+                    put("status", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Фильтр по статусу (open, in_progress, resolved) - опционально")
+                    })
+                },
+                required = listOf("user_id")
+            ),
+            handler = { arguments ->
+                val userId = arguments.arguments["user_id"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'user_id'"))
+                    )
+                val status = arguments.arguments["status"]?.jsonPrimitive?.content
+
+                val result = runBlocking {
+                    supportTools.executeTool(
+                        toolName = "get_user_tickets",
+                        arguments = buildMap {
+                            put("user_id", userId)
+                            status?.let { put("status", it) }
+                        }
+                    )
+                }
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Получить детали тикета
+        mcpServer.addTool(
+            name = "get_ticket_details",
+            description = "Получить детальную информацию о тикете включая историю",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("ticket_id", buildJsonObject {
+                        put("type", "string")
+                        put("description", "ID тикета")
+                    })
+                },
+                required = listOf("ticket_id")
+            ),
+            handler = { arguments ->
+                val ticketId = arguments.arguments["ticket_id"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'ticket_id'"))
+                    )
+
+                val result = runBlocking {
+                    supportTools.executeTool(
+                        toolName = "get_ticket_details",
+                        arguments = mapOf("ticket_id" to ticketId)
+                    )
+                }
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Поиск тикетов
+        mcpServer.addTool(
+            name = "search_tickets",
+            description = "Поиск тикетов по категории или ключевым словам",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("category", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Категория тикета (auth, ai, rag, code_review, deployment, general, ui, account, performance) - опционально")
+                    })
+                    put("keyword", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Ключевое слово для поиска в теме и описании - опционально")
+                    })
+                },
+                required = emptyList()
+            ),
+            handler = { arguments ->
+                val category = arguments.arguments["category"]?.jsonPrimitive?.content
+                val keyword = arguments.arguments["keyword"]?.jsonPrimitive?.content
+
+                val result = runBlocking {
+                    supportTools.executeTool(
+                        toolName = "search_tickets",
+                        arguments = buildMap {
+                            category?.let { put("category", it) }
+                            keyword?.let { put("keyword", it) }
+                        }
+                    )
+                }
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        // Инструмент: Найти похожие тикеты
+        mcpServer.addTool(
+            name = "get_similar_tickets",
+            description = "Найти похожие решенные тикеты по описанию проблемы",
+            inputSchema = Tool.Input(
+                properties = buildJsonObject {
+                    put("description", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Описание проблемы пользователя")
+                    })
+                },
+                required = listOf("description")
+            ),
+            handler = { arguments ->
+                val description = arguments.arguments["description"]?.jsonPrimitive?.content
+                    ?: return@addTool CallToolResult(
+                        content = listOf(TextContent("Ошибка: не указано поле 'description'"))
+                    )
+
+                val result = runBlocking {
+                    supportTools.executeTool(
+                        toolName = "get_similar_tickets",
+                        arguments = mapOf("description" to description)
+                    )
+                }
+                CallToolResult(content = listOf(TextContent(result)))
+            }
+        )
+
+        logger.info("✅ MCP инструменты системы поддержки зарегистрированы")
+
+    } catch (e: Exception) {
+        logger.error("❌ Ошибка регистрации MCP инструментов поддержки: ${e.message}", e)
+    }
+
+    routing {
+        mcp("/mcp/support") { mcpServer }
+    }
+
+    logger.info("🚀 Support MCP сервер запущен на /mcp/support")
 
     return mcpServer
 }

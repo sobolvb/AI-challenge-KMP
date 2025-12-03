@@ -1,0 +1,320 @@
+{
+  "users": [
+    {
+      "id": "user001",
+      "name": "Иван Петров",
+      "email": "ivan.petrov@example.com",
+      "plan": "premium",
+      "registeredAt": "2024-10-15T10:30:00Z",
+      "status": "active",
+      "company": "TechCorp"
+    },
+    {
+      "id": "user002",
+      "name": "Мария Сидорова",
+      "email": "maria.sidorova@example.com",
+      "plan": "basic",
+      "registeredAt": "2024-11-01T14:20:00Z",
+      "status": "active",
+      "company": "StartupLab"
+    },
+    {
+      "id": "user003",
+      "name": "Алексей Иванов",
+      "email": "alexey.ivanov@example.com",
+      "plan": "enterprise",
+      "registeredAt": "2024-09-10T09:00:00Z",
+      "status": "active",
+      "company": "BigCorp Inc"
+    },
+    {
+      "id": "user004",
+      "name": "Елена Кузнецова",
+      "email": "elena.kuznetsova@example.com",
+      "plan": "trial",
+      "registeredAt": "2024-12-01T16:45:00Z",
+      "status": "trial",
+      "company": null
+    },
+    {
+      "id": "user005",
+      "name": "Дмитрий Смирнов",
+      "email": "dmitry.smirnov@example.com",
+      "plan": "basic",
+      "registeredAt": "2024-10-20T11:15:00Z",
+      "status": "suspended",
+      "company": "DevStudio"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "ticket001",
+      "userId": "user001",
+      "subject": "Не работает авторизация через GitHub",
+      "description": "При попытке войти через GitHub получаю ошибку 401. Токен настроен в переменных окружения.",
+      "status": "open",
+      "priority": "high",
+      "category": "auth",
+      "createdAt": "2024-12-02T10:00:00Z",
+      "updatedAt": "2024-12-02T10:00:00Z",
+      "history": [
+        {
+          "timestamp": "2024-12-02T10:00:00Z",
+          "action": "created",
+          "actor": "user001",
+          "comment": "Создан тикет"
+        }
+      ]
+    },
+    {
+      "id": "ticket002",
+      "userId": "user001",
+      "subject": "YandexGPT возвращает пустые ответы",
+      "description": "После обновления API YandexGPT начала возвращать пустые ответы. В логах вижу успешный статус 200.",
+      "status": "in_progress",
+      "priority": "critical",
+      "category": "ai",
+      "createdAt": "2024-12-01T15:30:00Z",
+      "updatedAt": "2024-12-02T09:00:00Z",
+      "assignedTo": "support_team",
+      "history": [
+        {
+          "timestamp": "2024-12-01T15:30:00Z",
+          "action": "created",
+          "actor": "user001",
+          "comment": "Создан тикет"
+        },
+        {
+          "timestamp": "2024-12-01T16:00:00Z",
+          "action": "status_changed",
+          "actor": "support_team",
+          "comment": "Взято в работу. Проверяем API key."
+        },
+        {
+          "timestamp": "2024-12-02T09:00:00Z",
+          "action": "commented",
+          "actor": "support_team",
+          "comment": "Проблема в неправильном modelId. Используйте 'yandexgpt-lite' вместо 'yandex-gpt'"
+        }
+      ]
+    },
+    {
+      "id": "ticket003",
+      "userId": "user002",
+      "subject": "Как проиндексировать свою документацию?",
+      "description": "Хочу добавить свои markdown файлы в RAG. Какой endpoint использовать?",
+      "status": "resolved",
+      "priority": "medium",
+      "category": "rag",
+      "createdAt": "2024-11-28T11:20:00Z",
+      "updatedAt": "2024-11-28T14:00:00Z",
+      "resolvedAt": "2024-11-28T14:00:00Z",
+      "history": [
+        {
+          "timestamp": "2024-11-28T11:20:00Z",
+          "action": "created",
+          "actor": "user002",
+          "comment": "Создан тикет"
+        },
+        {
+          "timestamp": "2024-11-28T12:00:00Z",
+          "action": "commented",
+          "actor": "support_team",
+          "comment": "Используйте POST /api/rag/index/docs. См. документацию в faq.md"
+        },
+        {
+          "timestamp": "2024-11-28T14:00:00Z",
+          "action": "resolved",
+          "actor": "user002",
+          "comment": "Спасибо! Все работает."
+        }
+      ]
+    },
+    {
+      "id": "ticket004",
+      "userId": "user002",
+      "subject": "Ollama connection timeout при индексации",
+      "description": "При запуске индексации кода получаю ошибку EOF from Ollama. Ollama запущен и работает.",
+      "status": "resolved",
+      "priority": "high",
+      "category": "rag",
+      "createdAt": "2024-11-30T09:15:00Z",
+      "updatedAt": "2024-11-30T10:30:00Z",
+      "resolvedAt": "2024-11-30T10:30:00Z",
+      "history": [
+        {
+          "timestamp": "2024-11-30T09:15:00Z",
+          "action": "created",
+          "actor": "user002",
+          "comment": "Создан тикет"
+        },
+        {
+          "timestamp": "2024-11-30T09:45:00Z",
+          "action": "commented",
+          "actor": "support_team",
+          "comment": "Это известная проблема. Ollama перегружается при массовой индексации. Добавлены задержки между запросами и retry логика."
+        },
+        {
+          "timestamp": "2024-11-30T10:30:00Z",
+          "action": "resolved",
+          "actor": "user002",
+          "comment": "После обновления работает стабильно!"
+        }
+      ]
+    },
+    {
+      "id": "ticket005",
+      "userId": "user003",
+      "subject": "GitHub Action не создает комментарий в PR",
+      "description": "Настроил workflow для автоматического code review, но комментарий не появляется. Получаю ошибку 403.",
+      "status": "resolved",
+      "priority": "high",
+      "category": "code_review",
+      "createdAt": "2024-12-02T14:00:00Z",
+      "updatedAt": "2024-12-02T16:00:00Z",
+      "resolvedAt": "2024-12-02T16:00:00Z",
+      "history": [
+        {
+          "timestamp": "2024-12-02T14:00:00Z",
+          "action": "created",
+          "actor": "user003",
+          "comment": "Создан тикет. Ошибка: Resource not accessible by integration"
+        },
+        {
+          "timestamp": "2024-12-02T15:00:00Z",
+          "action": "commented",
+          "actor": "support_team",
+          "comment": "Нужно добавить permissions в workflow: issues: write, pull-requests: write"
+        },
+        {
+          "timestamp": "2024-12-02T16:00:00Z",
+          "action": "resolved",
+          "actor": "user003",
+          "comment": "Добавил permissions, теперь работает! Спасибо!"
+        }
+      ]
+    },
+    {
+      "id": "ticket006",
+      "userId": "user003",
+      "subject": "Как настроить ngrok для GitHub Actions?",
+      "description": "Не понимаю, как правильно настроить ngrok чтобы GitHub Actions мог вызывать мой локальный сервер.",
+      "status": "resolved",
+      "priority": "medium",
+      "category": "deployment",
+      "createdAt": "2024-12-01T10:00:00Z",
+      "updatedAt": "2024-12-01T11:30:00Z",
+      "resolvedAt": "2024-12-01T11:30:00Z",
+      "history": [
+        {
+          "timestamp": "2024-12-01T10:00:00Z",
+          "action": "created",
+          "actor": "user003",
+          "comment": "Создан тикет"
+        },
+        {
+          "timestamp": "2024-12-01T10:30:00Z",
+          "action": "commented",
+          "actor": "support_team",
+          "comment": "1. brew install ngrok\n2. ngrok http 8080\n3. Скопируйте HTTPS URL\n4. Добавьте в GitHub secrets как CODE_REVIEW_SERVER_URL"
+        },
+        {
+          "timestamp": "2024-12-01T11:30:00Z",
+          "action": "resolved",
+          "actor": "user003",
+          "comment": "Все настроил, работает отлично!"
+        }
+      ]
+    },
+    {
+      "id": "ticket007",
+      "userId": "user004",
+      "subject": "Какие модели AI поддерживаются?",
+      "description": "Хочу понять, какие модели доступны и какую выбрать для работы с кодом.",
+      "status": "resolved",
+      "priority": "low",
+      "category": "general",
+      "createdAt": "2024-12-01T13:00:00Z",
+      "updatedAt": "2024-12-01T13:15:00Z",
+      "resolvedAt": "2024-12-01T13:15:00Z",
+      "history": [
+        {
+          "timestamp": "2024-12-01T13:00:00Z",
+          "action": "created",
+          "actor": "user004",
+          "comment": "Создан тикет"
+        },
+        {
+          "timestamp": "2024-12-01T13:15:00Z",
+          "action": "resolved",
+          "actor": "support_team",
+          "comment": "Доступны: YandexGPT Lite, Ollama llama3.2, Ollama qwen2.5-coder. Для работы с кодом рекомендуем qwen2.5-coder."
+        }
+      ]
+    },
+    {
+      "id": "ticket008",
+      "userId": "user004",
+      "subject": "Не могу переключить модель в чате",
+      "description": "Выбираю другую модель из списка, но ответы всё равно идут от предыдущей.",
+      "status": "open",
+      "priority": "medium",
+      "category": "ui",
+      "createdAt": "2024-12-02T12:00:00Z",
+      "updatedAt": "2024-12-02T12:00:00Z",
+      "history": [
+        {
+          "timestamp": "2024-12-02T12:00:00Z",
+          "action": "created",
+          "actor": "user004",
+          "comment": "Создан тикет"
+        }
+      ]
+    },
+    {
+      "id": "ticket009",
+      "userId": "user005",
+      "subject": "Восстановление доступа к аккаунту",
+      "description": "Мой аккаунт был приостановлен. Как восстановить доступ?",
+      "status": "in_progress",
+      "priority": "high",
+      "category": "account",
+      "createdAt": "2024-12-02T08:00:00Z",
+      "updatedAt": "2024-12-02T11:00:00Z",
+      "assignedTo": "admin_team",
+      "history": [
+        {
+          "timestamp": "2024-12-02T08:00:00Z",
+          "action": "created",
+          "actor": "user005",
+          "comment": "Создан тикет"
+        },
+        {
+          "timestamp": "2024-12-02T11:00:00Z",
+          "action": "status_changed",
+          "actor": "admin_team",
+          "comment": "Проверяем причину приостановки. Свяжемся в течение 2 часов."
+        }
+      ]
+    },
+    {
+      "id": "ticket010",
+      "userId": "user005",
+      "subject": "Медленная работа при индексации большого проекта",
+      "description": "При индексации проекта на 500+ файлов система зависает. Можно ли ускорить процесс?",
+      "status": "open",
+      "priority": "medium",
+      "category": "performance",
+      "createdAt": "2024-12-01T17:00:00Z",
+      "updatedAt": "2024-12-01T17:00:00Z",
+      "history": [
+        {
+          "timestamp": "2024-12-01T17:00:00Z",
+          "action": "created",
+          "actor": "user005",
+          "comment": "Создан тикет. Индексация занимает более 30 минут."
+        }
+      ]
+    }
+  ]
+}

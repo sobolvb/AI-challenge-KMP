@@ -175,33 +175,48 @@ object AppContainer {
     }
 
     /**
-     * Оркестратор инструментов для YandexGPT — всё через MCP.
+     * Team Tool Executor - объединяет все инструменты для командного ассистента
+     * ВАЖНО: Определяем ДО modelRegistry, чтобы использовать в YandexGPTProvider
      */
-    val toolExecutor: ToolExecutor by lazy {
-        //McpAwareToolExecutor(mcpClientRegistry)
-        LocalToolExecutor(reminderService)
+    val teamToolExecutor by lazy {
+        logger.info("🛠️ Инициализация TeamToolExecutor")
+        com.aichallengekmp.tools.TeamToolExecutor(
+            ragSearchService = ragSearchService,
+            trackerTools = trackerTools,
+            gitTools = gitTools,
+            supportTools = supportTools,
+            reminderService = reminderService
+        )
+    }
 
+    /**
+     * Оркестратор инструментов для YandexGPT — всё через teamToolExecutor.
+     * @deprecated Используйте teamToolExecutor напрямую
+     */
+    @Deprecated("Use teamToolExecutor instead", ReplaceWith("teamToolExecutor"))
+    val toolExecutor: ToolExecutor by lazy {
+        teamToolExecutor
     }
 
     // ============= AI Providers =============
-    
+
     val modelRegistry by lazy {
         logger.info("🤖 Инициализация ModelRegistry")
         val registry = ModelRegistry()
-        
+
         if (config.yandexApiKey.isNotBlank() && config.yandexFolderId.isNotBlank()) {
             logger.info("✅ Регистрация YandexGPT провайдера")
             val yandexProvider = YandexGPTProvider(
                 httpClient = httpClient,
                 apiKey = config.yandexApiKey,
                 folderId = config.yandexFolderId,
-                toolExecutor = toolExecutor  // Все вызовы инструментов идут через оркестратор (MCP внутри)
+                toolExecutor = teamToolExecutor  // Используем teamToolExecutor со ВСЕМИ инструментами
             )
             registry.registerProvider(yandexProvider)
         } else {
             logger.warn("⚠️ YandexGPT API ключи не найдены!")
         }
-        
+
         registry
     }
     
@@ -223,7 +238,9 @@ object AppContainer {
             trackerTools = trackerTools,
             ragSearchService = ragSearchService,
             ragSourceDao = ragSourceDao,
-            gitTools = gitTools
+            gitTools = gitTools,
+            teamToolExecutor = teamToolExecutor,
+            supportTools = supportTools
         )
     }
 
@@ -254,6 +271,21 @@ object AppContainer {
         com.aichallengekmp.service.SupportAssistantService(
             supportTools = supportTools,
             ragSearchService = ragSearchService,
+            modelRegistry = modelRegistry
+        )
+    }
+
+    /**
+     * Командный ассистент (RAG + MCP + AI)
+     * Объединяет все компоненты системы
+     */
+    val teamAssistantService by lazy {
+        logger.info("👥 Инициализация TeamAssistantService")
+        com.aichallengekmp.service.TeamAssistantService(
+            ragSearchService = ragSearchService,
+            trackerTools = trackerTools,
+            gitTools = gitTools,
+            supportTools = supportTools,
             modelRegistry = modelRegistry
         )
     }

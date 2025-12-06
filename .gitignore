@@ -17,3 +17,9 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal

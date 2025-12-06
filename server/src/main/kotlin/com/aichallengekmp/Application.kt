@@ -117,13 +117,13 @@ fun Application.module() {
     // Routing (без дублирования ContentNegotiation)
     routing {
         // Health check endpoint
-//        get("/health") {
-//            call.respond(mapOf(
-//                "status" to "OK",
-//                "service" to "AI Challenge KMP",
-//                "timestamp" to System.currentTimeMillis()
-//            ))
-//        }
+        get("/health") {
+            call.respond(mapOf(
+                "status" to "OK",
+                "service" to "AI Challenge KMP",
+                "timestamp" to System.currentTimeMillis()
+            ))
+        }
 
         // Chat API routes
         route("/api") {

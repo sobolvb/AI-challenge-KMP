@@ -212,3 +212,6 @@ permissions:
 - architecture.md - архитектура системы
 - api-reference.md - описание API
 - code-style.md - соглашения по коду
+
+
+тестовое изменение

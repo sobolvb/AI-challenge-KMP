@@ -25,9 +25,19 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
+/**
+ * Ответ health check endpoint'а
+ */
+@Serializable
+data class HealthResponse(
+    val status: String,
+    val service: String,
+    val timestamp: Long
+)
 
 @ExperimentalSerializationApi
 fun Application.module() {
@@ -118,11 +128,13 @@ fun Application.module() {
     routing {
         // Health check endpoint
         get("/health") {
-            call.respond(mapOf(
-                "status" to "OK",
-                "service" to "AI Challenge KMP",
-                "timestamp" to System.currentTimeMillis()
-            ))
+            call.respond(
+                HealthResponse(
+                    status = "OK",
+                    service = "AI Challenge KMP",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
         }
 
         // Chat API routes

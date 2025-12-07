@@ -213,5 +213,3 @@ permissions:
 - api-reference.md - описание API
 - code-style.md - соглашения по коду
 
-
-тестовое изменение

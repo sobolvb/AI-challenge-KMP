@@ -1,0 +1,98 @@
+name: Auto RAG Reindex
+
+# Триггер: автоматический запуск при изменении документации
+on:
+  push:
+    paths:
+      - 'project/docs/**/*.md'
+    branches:
+      - '**'  # любая ветка
+  workflow_dispatch:  # Возможность ручного запуска
+
+jobs:
+  reindex-docs:
+    runs-on: ubuntu-latest
+    name: Переиндексация RAG документации
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check server health
+        id: health
+        run: |
+          echo "🏥 Проверка здоровья сервера..."
+          HEALTH_RESPONSE=$(curl -X GET "${{ secrets.RAG_SERVER_URL }}/health" \
+            -s -w "\n%{http_code}" \
+            --connect-timeout 10 \
+            --max-time 30)
+
+          HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n1)
+          BODY=$(echo "$HEALTH_RESPONSE" | head -n-1)
+
+          echo "HTTP Code: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ Сервер недоступен или нездоров (HTTP $HTTP_CODE)"
+            echo "health_ok=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "✅ Сервер здоров"
+          echo "health_ok=true" >> $GITHUB_OUTPUT
+
+      - name: Trigger RAG reindexing
+        if: steps.health.outputs.health_ok == 'true'
+        id: reindex
+        run: |
+          echo "📚 Запуск переиндексации документации..."
+
+          RESPONSE=$(curl -X POST "${{ secrets.RAG_SERVER_URL }}/api/rag/index/docs" \
+            -H "Content-Type: application/json" \
+            -s -w "\n%{http_code}" \
+            --connect-timeout 30 \
+            --max-time 300)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Code: $HTTP_CODE"
+          echo "Response Body:"
+          echo "$BODY" | jq '.' || echo "$BODY"
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ Ошибка при переиндексации (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+          # Извлекаем количество проиндексированных файлов
+          INDEXED_COUNT=$(echo "$BODY" | jq '.indexed | length' 2>/dev/null || echo "unknown")
+
+          echo "✅ Переиндексация успешно завершена"
+          echo "📊 Проиндексировано файлов: $INDEXED_COUNT"
+          echo "indexed_count=$INDEXED_COUNT" >> $GITHUB_OUTPUT
+
+          # Сохраняем результат для следующего шага
+          echo "$BODY" > reindex_result.json
+
+      - name: Parse and display results
+        if: success()
+        run: |
+          echo "📋 Результаты переиндексации:"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          if [ -f "reindex_result.json" ]; then
+            cat reindex_result.json | jq -r '.indexed[] | "  ✓ \(.sourceId) → \(.chunks) chunks"' || true
+          fi
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Документация в RAG актуальна!"
+
+      - name: Upload reindex results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-reindex-results
+          path: reindex_result.json
+          retention-days: 7

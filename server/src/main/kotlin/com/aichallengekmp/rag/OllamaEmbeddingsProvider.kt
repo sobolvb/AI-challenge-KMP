@@ -1,11 +1,9 @@
 package com.aichallengekmp.rag
 
 import io.ktor.client.*
-import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -45,60 +43,44 @@ class OllamaEmbeddingsProvider(
 
         val url = "$baseUrl/api/embeddings"
 
-        // Retry logic для надежности
-        var lastException: Exception? = null
-        repeat(3) { attempt ->
-            try {
-                if (attempt > 0) {
-                    logger.debug("🔄 Повторная попытка {}/3", attempt + 1)
-                    delay(1000L * attempt) // Экспоненциальная задержка
-                }
-
-                val httpResponse = httpClient.post(url) {
-                    contentType(ContentType.Application.Json)
-                    setBody(payload)
-                    timeout {
-                        requestTimeoutMillis = 30000 // 30 секунд
-                    }
-                }
-
-                val raw = httpResponse.bodyAsText()
-                logger.debug("📡 RAW ответ от Ollama: {}", raw)
-
-                val json = Json { ignoreUnknownKeys = true }
-
-                // Пытаемся сначала декодировать в EmbeddingsResponse (embedding или embeddings)
-                val decoded = try {
-                    json.decodeFromString(EmbeddingsResponse.serializer(), raw)
-                } catch (_: Exception) {
-                    null
-                }
-
-                val embeddingList: List<Float>? = when {
-                    decoded?.embedding != null -> decoded.embedding
-                    !decoded?.embeddings.isNullOrEmpty() -> decoded!!.embeddings!!.firstOrNull()
-                    else -> {
-                        // Фоллбек: парсим JSON вручную и ищем первое подходящее числовое массивное поле
-                        extractEmbeddingManually(json.parseToJsonElement(raw))
-                    }
-                }
-
-                if (embeddingList == null) {
-                    throw IllegalStateException("Не удалось найти поле embedding в ответе Ollama: $raw")
-                }
-
-                val vector = embeddingList.toFloatArray()
-                logger.debug("✅ Получен вектор размерности {} от Ollama", vector.size)
-                return vector
-            } catch (e: Exception) {
-                lastException = e
-                logger.warn("⚠️ Попытка {}/3 не удалась: {}", attempt + 1, e.message)
+        return try {
+            val httpResponse = httpClient.post(url) {
+                contentType(ContentType.Application.Json)
+                setBody(payload)
             }
-        }
 
-        // Если все попытки провалились
-        logger.error("❌ Ошибка при получении эмбеддингов из Ollama после 3 попыток: {}", lastException?.message, lastException)
-        throw RuntimeException("Ошибка при получении эмбеддингов из Ollama: ${lastException?.message}", lastException)
+            val raw = httpResponse.bodyAsText()
+            logger.debug("📡 RAW ответ от Ollama: {}", raw)
+
+            val json = Json { ignoreUnknownKeys = true }
+
+            // Пытаемся сначала декодировать в EmbeddingsResponse (embedding или embeddings)
+            val decoded = try {
+                json.decodeFromString(EmbeddingsResponse.serializer(), raw)
+            } catch (_: Exception) {
+                null
+            }
+
+            val embeddingList: List<Float>? = when {
+                decoded?.embedding != null -> decoded.embedding
+                !decoded?.embeddings.isNullOrEmpty() -> decoded!!.embeddings!!.firstOrNull()
+                else -> {
+                    // Фоллбек: парсим JSON вручную и ищем первое подходящее числовое массивное поле
+                    extractEmbeddingManually(json.parseToJsonElement(raw))
+                }
+            }
+
+            if (embeddingList == null) {
+                throw IllegalStateException("Не удалось найти поле embedding в ответе Ollama: $raw")
+            }
+
+            val vector = embeddingList.toFloatArray()
+            logger.debug("✅ Получен вектор размерности {} от Ollama", vector.size)
+            vector
+        } catch (e: Exception) {
+            logger.error("❌ Ошибка при получении эмбеддингов из Ollama: {}", e.message, e)
+            throw RuntimeException("Ошибка при получении эмбеддингов из Ollama: ${e.message}", e)
+        }
     }
 
     /**

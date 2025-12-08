@@ -23,9 +23,7 @@ class ChatService(
     private val trackerTools: TrackerToolsService,
     private val ragSearchService: com.aichallengekmp.rag.RagSearchService,
     private val ragSourceDao: RagSourceDao,
-    private val gitTools: com.aichallengekmp.tools.GitToolsService,
-    private val teamToolExecutor: com.aichallengekmp.tools.TeamToolExecutor? = null,
-    private val supportTools: com.aichallengekmp.tools.SupportToolsService? = null
+    private val gitTools: com.aichallengekmp.tools.GitToolsService
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
 
@@ -284,7 +282,7 @@ class ChatService(
         val messages = messageDao.getBySessionId(sessionId)
         val compressionInfo = compressionService.getCompressionInfo(sessionId)
 
-        val messageDtos = messages.map { it.toDto(ragSourceDao) }
+        val messageDtos = messages.map { it.toDto(ragSourceDao, modelRegistry) }
 
         return SessionDetailResponse(
             id = session.id,
@@ -388,31 +386,14 @@ class ChatService(
         Используй свои знания для ответов на общие вопросы.
 
         Дополнительно ты имеешь доступ к специальным инструментам:
-
-        📋 Управление задачами:
         - get_issues_count: получить количество задач в трекере.
         - get_all_issue_names: получить список задач с их ключами и названиями.
         - get_issue_info: получить подробную информацию о задаче по ключу.
-
-        ⏰ Напоминания:
         - list_reminders: получить список всех существующих напоминаний пользователя.
         - create_reminder: создать новое напоминание на указанное время.
         - delete_reminder: удалить существующее напоминание.
-
-        🔍 Поиск в проекте (RAG):
-        - search_documentation: поиск информации в документации проекта (FAQ, архитектура, API).
-        - search_code: поиск фрагментов кода в проекте (Kotlin файлы).
         - search_docs: выполнить поиск по локальному индексу документации проекта и вернуть релевантные фрагменты.
-
-        🔧 Git/GitHub:
         - get_git_branch: получить название текущей git ветки проекта.
-
-        🎯 Анализ и приоритеты:
-        - analyze_task_priorities: проанализировать задачи по приоритетам, срокам и дать умные рекомендации (что делать первым).
-
-        💬 Поддержка пользователей:
-        - search_support_tickets: поиск тикетов поддержки по категории или ключевым словам.
-        - get_similar_tickets: найти похожие решенные тикеты поддержки по описанию проблемы.
 
         Общие правила:
         - По умолчанию отвечай на вопросы используя СВОИ знания (о мире, науке, программировании и т.д.)
@@ -420,9 +401,6 @@ class ChatService(
         - Если вопрос НЕ про проект (погода, наука и т.д.) - игнорируй справочную информацию и отвечай сам
         - Если пользователь просит разобраться с задачами, сделать сводку или проверить напоминания,
           используй инструменты, чтобы сначала собрать нужные данные, а затем сформировать ответ.
-        - Если пользователь спрашивает про код или архитектуру проекта - используй search_code или search_documentation.
-        - Если пользователь просит "что делать первым" или "какие задачи приоритетные" - используй analyze_task_priorities.
-        - Если пользователь спрашивает про ошибку или проблему - попробуй найти похожие решенные тикеты через get_similar_tickets.
         - Если нужно понять, есть ли напоминание про важную задачу, сначала получи список задач
           (например, get_all_issue_names или get_issue_info), затем список напоминаний (list_reminders)
           и сравни их содержимое по смыслу.
@@ -453,17 +431,8 @@ class ChatService(
         }
 
         // Получаем доступные инструменты из всех источников
-        val baseTools = trackerTools.getAvailableTools() + gitTools.getAvailableTools()
-
-        // Добавляем инструменты командного ассистента если доступны
-        val teamTools = if (teamToolExecutor != null && supportTools != null) {
-            getTeamAssistantTools()
-        } else {
-            emptyList()
-        }
-
-        val availableTools = baseTools + teamTools
-        logger.info("🔧 Передаем YandexGPT ${availableTools.size} инструментов (base: ${baseTools.size}, team: ${teamTools.size})")
+        val availableTools = trackerTools.getAvailableTools() + gitTools.getAvailableTools()
+        logger.info("🔧 Передаем YandexGPT ${availableTools.size} инструментов")
 
         // Строим итоговый system prompt: RAG-контекст в НАЧАЛЕ (самое важное), потом основной промпт
         val effectiveSystemPrompt = buildString {
@@ -748,47 +717,6 @@ class ChatService(
 
         return getSessionDetail(sessionId)
     }
-
-    /**
-     * Получить список инструментов командного ассистента
-     */
-    private fun getTeamAssistantTools(): List<com.aichallengekmp.tools.ToolDefinition> {
-        return listOf(
-            com.aichallengekmp.tools.ToolDefinition(
-                name = "search_documentation",
-                description = "Поиск информации в документации проекта (FAQ, архитектура, API). Возвращает релевантные фрагменты документации.",
-                parameters = mapOf(
-                    "query" to "Поисковый запрос"
-                )
-            ),
-            com.aichallengekmp.tools.ToolDefinition(
-                name = "search_code",
-                description = "Поиск фрагментов кода в проекте (Kotlin файлы). Возвращает релевантные фрагменты кода с указанием источников.",
-                parameters = mapOf(
-                    "query" to "Что искать в коде"
-                )
-            ),
-            com.aichallengekmp.tools.ToolDefinition(
-                name = "analyze_task_priorities",
-                description = "Проанализировать задачи по приоритетам и дать рекомендации по очередности выполнения. Учитывает срочность, важность, просроченные задачи.",
-                parameters = emptyMap()
-            ),
-            com.aichallengekmp.tools.ToolDefinition(
-                name = "search_support_tickets",
-                description = "Поиск тикетов поддержки по ключевому слову. Ищет в теме и описании тикетов.",
-                parameters = mapOf(
-                    "keyword" to "Ключевое слово для поиска"
-                )
-            ),
-            com.aichallengekmp.tools.ToolDefinition(
-                name = "get_similar_tickets",
-                description = "Найти похожие решенные тикеты поддержки по описанию проблемы",
-                parameters = mapOf(
-                    "description" to "Описание проблемы"
-                )
-            )
-        )
-    }
 }
 
 // ============= Extensions =============
@@ -810,7 +738,7 @@ private fun SessionSettingsDto.toDbModel(sessionId: String) = SessionSettings(
     systemPrompt = systemPrompt
 )
 
-private suspend fun Message.toDto(ragSourceDao: RagSourceDao): MessageDto {
+private suspend fun Message.toDto(ragSourceDao: RagSourceDao, modelRegistry: ModelRegistry): MessageDto {
     // Загружаем источники RAG для этого сообщения
     val ragSources = if (role == "assistant") {
         try {
@@ -830,12 +758,17 @@ private suspend fun Message.toDto(ragSourceDao: RagSourceDao): MessageDto {
         null
     }
 
+    // Получаем реальное имя модели из registry
+    val modelName = modelId?.let { id ->
+        modelRegistry.getModel(id)?.displayName ?: id
+    }
+
     return MessageDto(
         id = id,
         role = role,
         content = content,
         modelId = modelId,
-        modelName = modelId?.let { "YandexGPT Lite" }, // TODO: получать из registry
+        modelName = modelName,
         tokenUsage = if (role == "assistant") {
             TokenUsageDto(
                 inputTokens = inputTokens.toInt(),

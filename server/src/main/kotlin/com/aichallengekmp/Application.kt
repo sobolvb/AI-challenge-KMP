@@ -3,14 +3,9 @@ package com.aichallengekmp
 import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.routing.chatRoutes
 import com.aichallengekmp.routing.ragRoutes
-import com.aichallengekmp.routing.codeReviewRoutes
-import com.aichallengekmp.routing.supportRoutes
-import com.aichallengekmp.routing.teamRoutes
 import com.aichallengekmp.mcp.configureMcpServer
 import com.aichallengekmp.mcp.configureTrackerMcpServer
 import com.aichallengekmp.mcp.configureRemindersMcpServer
-import com.aichallengekmp.mcp.configureGitMcpServer
-import com.aichallengekmp.mcp.configureSupportMcpServer
 import com.aichallengekmp.scheduler.ReminderScheduler
 import com.aichallengekmp.scheduler.ReminderNotifications
 import io.ktor.serialization.kotlinx.json.*
@@ -25,19 +20,9 @@ import io.ktor.server.websocket.WebSockets
 import io.ktor.sse.ServerSentEvent
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
-/**
- * Ответ health check endpoint'а
- */
-@Serializable
-data class HealthResponse(
-    val status: String,
-    val service: String,
-    val timestamp: Long
-)
 
 @ExperimentalSerializationApi
 fun Application.module() {
@@ -81,16 +66,6 @@ fun Application.module() {
         reminderService = AppContainer.reminderService
     )
 
-    // Отдельный MCP сервер для Git/GitHub
-    configureGitMcpServer(
-        gitTools = AppContainer.gitTools
-    )
-
-    // Отдельный MCP сервер для системы поддержки
-    configureSupportMcpServer(
-        supportTools = AppContainer.supportTools
-    )
-
     // Фоновый планировщик напоминаний, работает 24/7 после старта сервера
     ReminderScheduler(
         reminderService = AppContainer.reminderService,
@@ -127,23 +102,18 @@ fun Application.module() {
     // Routing (без дублирования ContentNegotiation)
     routing {
         // Health check endpoint
-        get("/health") {
-            call.respond(
-                HealthResponse(
-                    status = "OK",
-                    service = "AI Challenge KMP",
-                    timestamp = System.currentTimeMillis()
-                )
-            )
-        }
+//        get("/health") {
+//            call.respond(mapOf(
+//                "status" to "OK",
+//                "service" to "AI Challenge KMP",
+//                "timestamp" to System.currentTimeMillis()
+//            ))
+//        }
 
         // Chat API routes
         route("/api") {
             chatRoutes()
             ragRoutes()
-            codeReviewRoutes()
-            supportRoutes()
-            teamRoutes()
 
             // SSE-стрим с напоминаниями для клиента KMP (Ktor 3.x API)
             sse("/reminders/stream") {

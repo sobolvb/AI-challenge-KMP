@@ -1,6 +1,7 @@
 package com.aichallengekmp.di
 
 import com.aichallengekmp.ai.ModelRegistry
+import com.aichallengekmp.ai.OllamaProvider
 import com.aichallengekmp.ai.YandexGPTProvider
 import com.aichallengekmp.database.DatabaseFactory
 import com.aichallengekmp.database.dao.*
@@ -216,6 +217,14 @@ object AppContainer {
         } else {
             logger.warn("⚠️ YandexGPT API ключи не найдены!")
         }
+
+        // Ollama provider (локальные LLM модели)
+        logger.info("✅ Регистрация Ollama провайдера (локальные LLM)")
+        val ollamaProvider = OllamaProvider(
+            httpClient = httpClient,
+            baseUrl = System.getenv("OLLAMA_BASE_URL") ?: "http://localhost:11434"
+        )
+        registry.registerProvider(ollamaProvider)
 
         registry
     }

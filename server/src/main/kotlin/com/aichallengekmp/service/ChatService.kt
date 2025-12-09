@@ -284,7 +284,7 @@ class ChatService(
         val messages = messageDao.getBySessionId(sessionId)
         val compressionInfo = compressionService.getCompressionInfo(sessionId)
 
-        val messageDtos = messages.map { it.toDto(ragSourceDao) }
+        val messageDtos = messages.map { it.toDto(ragSourceDao, modelRegistry) }
 
         return SessionDetailResponse(
             id = session.id,
@@ -810,7 +810,7 @@ private fun SessionSettingsDto.toDbModel(sessionId: String) = SessionSettings(
     systemPrompt = systemPrompt
 )
 
-private suspend fun Message.toDto(ragSourceDao: RagSourceDao): MessageDto {
+private suspend fun Message.toDto(ragSourceDao: RagSourceDao, modelRegistry: ModelRegistry): MessageDto {
     // Загружаем источники RAG для этого сообщения
     val ragSources = if (role == "assistant") {
         try {
@@ -830,12 +830,17 @@ private suspend fun Message.toDto(ragSourceDao: RagSourceDao): MessageDto {
         null
     }
 
+    // Получаем реальное имя модели из registry
+    val modelName = modelId?.let { id ->
+        modelRegistry.getModel(id)?.displayName ?: id
+    }
+
     return MessageDto(
         id = id,
         role = role,
         content = content,
         modelId = modelId,
-        modelName = modelId?.let { "YandexGPT Lite" }, // TODO: получать из registry
+        modelName = modelName,
         tokenUsage = if (role == "assistant") {
             TokenUsageDto(
                 inputTokens = inputTokens.toInt(),

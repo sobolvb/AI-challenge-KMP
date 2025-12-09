@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    kotlin("plugin.serialization") version "2.2.20"
 }
 
 kotlin {
@@ -38,6 +39,10 @@ kotlin {
             implementation(libs.kotlinx.coroutinesSwing)
             // Логирование для desktop-клиента (SLF4J + Logback)
             implementation(libs.logback)
+            // Ktor для офлайн режима
+            implementation(libs.ktor.client)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx)
         }
     }
 }

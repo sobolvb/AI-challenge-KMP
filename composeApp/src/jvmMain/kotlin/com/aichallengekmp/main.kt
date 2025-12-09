@@ -1,10 +1,27 @@
 package com.aichallengekmp
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.aichallengekmp.di.appModule
+import com.aichallengekmp.offline.OfflineChatScreen
 import com.aichallengekmp.theme.ChatTheme
 import com.aichallengekmp.ui.ChatScreen
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import kotlinx.coroutines.launch
 import org.koin.core.context.startKoin
 
 fun main() {
@@ -14,13 +31,58 @@ fun main() {
     }
 
     application {
+        val scope = rememberCoroutineScope()
+        var offlineMode by remember { mutableStateOf(false) }
+        var isChecking by remember { mutableStateOf(true) }
+
+        // Проверяем доступность сервера при запуске
+        LaunchedEffect(Unit) {
+            scope.launch {
+                val serverAvailable = try {
+                    val client = HttpClient(CIO)
+                    client.get("http://localhost:8080/api/models")
+                    client.close()
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+
+                offlineMode = !serverAvailable
+                isChecking = false
+            }
+        }
+
         Window(
             onCloseRequest = ::exitApplication,
-            title = "AI Challenge KMP",
+            title = if (offlineMode) "AI Chat (Offline)" else "AI Challenge KMP",
         ) {
             ChatTheme {
-                ChatScreen()
+                when {
+                    isChecking -> LoadingScreen()
+                    offlineMode -> OfflineChatScreen()
+                    else -> ChatScreen()
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun LoadingScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Проверка подключения к серверу...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+!build/libs/*-all.jar
+.gradle/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.log
+*.tmp
+*.bak
+
+# Source code (не нужен в образе, только JAR)
+src/
+gradle/
+gradlew
+gradlew.bat
+build.gradle.kts
+settings.gradle.kts

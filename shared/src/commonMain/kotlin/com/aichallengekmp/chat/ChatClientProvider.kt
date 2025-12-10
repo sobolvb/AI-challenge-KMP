@@ -12,11 +12,18 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
 /**
+ * Получить URL сервера из окружения или использовать значение по умолчанию
+ */
+expect fun getServerUrl(): String
+
+/**
  * Провайдер для создания HTTP клиента и репозитория
  */
 object ChatClientProvider {
 
-    const val BASE_URL = "http://localhost:8080"
+    val BASE_URL: String by lazy {
+        getServerUrl()
+    }
 
     private val httpClient: HttpClient by lazy {
         HttpClient(CIO) {

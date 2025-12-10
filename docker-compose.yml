@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Ollama - локальная LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ai-network
+
+  # Ktor сервер
+  ktor-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ai-ktor-server
+    ports:
+      - "8080:8080"
+    environment:
+      # Подключение к Ollama внутри Docker сети
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBED_MODEL=nomic-embed-text
+      # Yandex GPT (если нужен)
+      - YANDEX_GPT_API_KEY=${YANDEX_GPT_API_KEY:-}
+      - YANDEX_GPT_FOLDER_ID=${YANDEX_GPT_FOLDER_ID:-}
+      # База данных SQLite будет в volume
+      - DB_PATH=/data/ai-chat.db
+    volumes:
+      - server_data:/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai-network
+
+volumes:
+  ollama_data:
+    driver: local
+  server_data:
+    driver: local
+
+networks:
+  ai-network:
+    driver: bridge

@@ -490,7 +490,13 @@ class ChatService(
             temperature = settings.temperature,
             maxTokens = settings.maxTokens,
             systemPrompt = effectiveSystemPrompt,
-            tools = availableTools  // YandexGPT сам решит какие вызвать и как построить цепочку
+            tools = availableTools,  // YandexGPT сам решит какие вызвать и как построить цепочку
+            // Advanced LLM parameters
+            topP = settings.topP,
+            topK = settings.topK,
+            numCtx = settings.numCtx,
+            repeatPenalty = settings.repeatPenalty,
+            seed = settings.seed
         )
 
         return modelRegistry.complete(request)

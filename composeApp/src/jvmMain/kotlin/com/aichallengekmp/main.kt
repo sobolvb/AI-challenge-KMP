@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.aichallengekmp.chat.ChatClientProvider
 import com.aichallengekmp.di.appModule
 import com.aichallengekmp.offline.OfflineChatScreen
 import com.aichallengekmp.theme.ChatTheme
@@ -38,12 +39,17 @@ fun main() {
         // Проверяем доступность сервера при запуске
         LaunchedEffect(Unit) {
             scope.launch {
+                val serverUrl = ChatClientProvider.BASE_URL
+                println("Checking server availability at: $serverUrl")
+
                 val serverAvailable = try {
                     val client = HttpClient(CIO)
-                    client.get("http://localhost:8080/api/models")
+                    client.get("$serverUrl/api/models")
                     client.close()
+                    println("Server is available!")
                     true
                 } catch (e: Exception) {
+                    println("Server not available: ${e.message}")
                     false
                 }
 

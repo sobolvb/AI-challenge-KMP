@@ -2,6 +2,8 @@ package com.aichallengekmp.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -10,6 +12,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aichallengekmp.models.MessageDto
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -67,14 +71,37 @@ fun MessageCard(message: MessageDto) {
                         }
                     }
                 }
-                
-                // Время
-                Text(
-                    text = formatMessageTime(message.timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+                // Время + кнопка копирования
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = formatMessageTime(message.timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Кнопка копирования
+                    IconButton(
+                        onClick = {
+                            // Копирование в буфер обмена
+                            val clipboard = Toolkit.getDefaultToolkit().systemClipboard
+                            val stringSelection = StringSelection(message.content)
+                            clipboard.setContents(stringSelection, null)
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Копировать",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(8.dp))

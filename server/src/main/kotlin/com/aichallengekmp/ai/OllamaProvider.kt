@@ -77,7 +77,12 @@ class OllamaProvider(
             messages = messages,
             options = OllamaOptions(
                 temperature = request.temperature,
-                num_predict = request.maxTokens
+                num_predict = request.maxTokens,
+                top_p = request.topP,
+                top_k = request.topK,
+                num_ctx = request.numCtx,
+                repeat_penalty = request.repeatPenalty,
+                seed = request.seed
             ),
             stream = false
         )
@@ -194,7 +199,12 @@ class OllamaProvider(
     @Serializable
     private data class OllamaOptions(
         val temperature: Double,
-        val num_predict: Int? = null  // max tokens
+        val num_predict: Int? = null,       // max tokens
+        val top_p: Double? = null,          // nucleus sampling
+        val top_k: Int? = null,             // top-k sampling
+        val num_ctx: Int? = null,           // context window
+        val repeat_penalty: Double? = null, // repeat penalty
+        val seed: Int? = null               // random seed
     )
 
     @Serializable

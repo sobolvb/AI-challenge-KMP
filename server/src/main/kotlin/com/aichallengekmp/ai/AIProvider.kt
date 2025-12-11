@@ -44,7 +44,13 @@ data class CompletionRequest(
     val temperature: Double = 0.6,
     val maxTokens: Int = 2000,
     val systemPrompt: String? = null,
-    val tools: List<ToolDefinition>? = null
+    val tools: List<ToolDefinition>? = null,
+    // Advanced LLM parameters
+    val topP: Double? = null,           // Nucleus sampling (0.0 - 1.0)
+    val topK: Int? = null,              // Top-K sampling (1 - 100)
+    val numCtx: Int? = null,            // Context window size (e.g., 2048, 4096, 32768)
+    val repeatPenalty: Double? = null,  // Repeat penalty (0.0 - 2.0)
+    val seed: Int? = null               // Random seed for reproducibility
 )
 
 /**

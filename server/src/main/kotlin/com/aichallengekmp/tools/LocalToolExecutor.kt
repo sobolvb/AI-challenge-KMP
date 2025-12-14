@@ -135,6 +135,19 @@ class LocalToolExecutor(
                     AppContainer.gitTools.executeTool(toolName, arguments.filterValues { it != null } as Map<String, Any>)
                 }
 
+                // Analytics tools
+                "get_token_usage",
+                "get_token_usage_by_model",
+                "get_error_stats",
+                "get_slowest_endpoints",
+                "get_event_stats",
+                "get_http_status_stats",
+                "get_activity_by_hour",
+                "get_recent_events" -> {
+                    // Делегируем выполнение в AnalyticsToolsService
+                    AppContainer.analyticsTools.executeTool(toolName, arguments.filterValues { it != null } as Map<String, Any>)
+                }
+
                 else -> "Неизвестный инструмент (локальный): $toolName"
             }
         } catch (e: Exception) {

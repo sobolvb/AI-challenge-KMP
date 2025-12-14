@@ -90,6 +90,7 @@ object AppContainer {
     val reminderDao by lazy { ReminderDao(database) }
     val ragChunkDao by lazy { RagChunkDao(database) }
     val ragSourceDao by lazy { RagSourceDao(database) }
+    val analyticsEventDao by lazy { AnalyticsEventDao(database) }
     
     // ============= RAG / Embeddings =============
 
@@ -116,6 +117,11 @@ object AppContainer {
         ReminderService(reminderDao)
     }
 
+    val analyticsService by lazy {
+        logger.info("📊 Инициализация AnalyticsService")
+        com.aichallengekmp.service.AnalyticsService(analyticsEventDao)
+    }
+
     /**
      * Локальная реализация инструментов (без MCP) — используется как
      * fallback и для MCP-серверов.
@@ -123,6 +129,11 @@ object AppContainer {
     val trackerTools by lazy {
         logger.info("🔧 Инициализация TrackerToolsService (локальные инструменты)")
         TrackerToolsService(reminderService)
+    }
+
+    val analyticsTools by lazy {
+        logger.info("📊 Инициализация AnalyticsToolsService")
+        com.aichallengekmp.tools.AnalyticsToolsService(analyticsService)
     }
 
     /**
@@ -229,7 +240,9 @@ object AppContainer {
             trackerTools = trackerTools,
             ragSearchService = ragSearchService,
             ragSourceDao = ragSourceDao,
-            gitTools = gitTools
+            gitTools = gitTools,
+            analyticsService = analyticsService,
+            analyticsTools = analyticsTools
         )
     }
 }

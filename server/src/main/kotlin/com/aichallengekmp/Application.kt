@@ -43,7 +43,42 @@ fun Application.module() {
             explicitNulls = false
         })
     }
-    
+
+    // TODO: Analytics - автоматическое логирование HTTP запросов
+    // Будет реализовано после исправления проблем с Ktor API
+    /*
+    intercept(ApplicationCallPipeline.Monitoring) {
+        val startTime = System.currentTimeMillis()
+
+        try {
+            proceed()
+        } finally {
+            val endTime = System.currentTimeMillis()
+            val responseTime = endTime - startTime
+
+            val method = call.request.httpMethod.value
+            val path = call.request.uri
+            val statusCode = call.response.status()?.value ?: 0
+
+            // Логируем запрос асинхронно
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+                try {
+                    AppContainer.analyticsService.logApiRequest(
+                        method = method,
+                        path = path,
+                        statusCode = statusCode,
+                        responseTimeMs = responseTime,
+                        sessionId = null,
+                        metadata = null
+                    )
+                } catch (e: Exception) {
+                    logger.error("Ошибка логирования аналитики запроса: ${e.message}")
+                }
+            }
+        }
+    }
+    */
+
     // SSE для MCP
     install(SSE)
 

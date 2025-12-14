@@ -62,10 +62,57 @@ object DatabaseFactory {
 
                     driver.execute(
                         identifier = null,
+                        sql = """
+                            CREATE TABLE IF NOT EXISTS AnalyticsEvent (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                timestamp INTEGER NOT NULL,
+                                eventType TEXT NOT NULL,
+                                httpMethod TEXT,
+                                httpPath TEXT,
+                                httpStatus INTEGER,
+                                responseTimeMs INTEGER,
+                                modelId TEXT,
+                                inputTokens INTEGER,
+                                outputTokens INTEGER,
+                                llmTemperature REAL,
+                                llmResponseTimeMs INTEGER,
+                                errorType TEXT,
+                                errorMessage TEXT,
+                                sessionId TEXT,
+                                metadata TEXT
+                            );
+                        """.trimIndent(),
+                        parameters = 0
+                    )
+
+                    // Индексы для AnalyticsEvent
+                    driver.execute(
+                        identifier = null,
+                        sql = "CREATE INDEX IF NOT EXISTS analytics_event_type ON AnalyticsEvent(eventType);",
+                        parameters = 0
+                    )
+                    driver.execute(
+                        identifier = null,
+                        sql = "CREATE INDEX IF NOT EXISTS analytics_timestamp ON AnalyticsEvent(timestamp);",
+                        parameters = 0
+                    )
+                    driver.execute(
+                        identifier = null,
+                        sql = "CREATE INDEX IF NOT EXISTS analytics_session ON AnalyticsEvent(sessionId);",
+                        parameters = 0
+                    )
+                    driver.execute(
+                        identifier = null,
+                        sql = "CREATE INDEX IF NOT EXISTS analytics_model ON AnalyticsEvent(modelId);",
+                        parameters = 0
+                    )
+
+                    driver.execute(
+                        identifier = null,
                         sql = "PRAGMA user_version = $schemaVersion",
                         parameters = 0
                     )
-                    logger.info("✅ Временная миграция: таблицы Reminder и DocumentChunk созданы (если отсутствовали), user_version обновлён до $schemaVersion")
+                    logger.info("✅ Временная миграция: таблицы Reminder, DocumentChunk и AnalyticsEvent созданы (если отсутствовали), user_version обновлён до $schemaVersion")
                 } catch (e: Exception) {
                     logger.error("❌ Ошибка временной миграции для таблиц Reminder/DocumentChunk: ${e.message}", e)
                 }

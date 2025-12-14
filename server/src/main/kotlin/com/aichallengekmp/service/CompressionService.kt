@@ -193,8 +193,25 @@ class CompressionService(
             temperature = 0.3,
             maxTokens = 1000
         )
-        
+
+        val startTime = System.currentTimeMillis()
         val result = modelRegistry.complete(request)
+        val responseTime = System.currentTimeMillis() - startTime
+
+        // Логируем вызов LLM
+        try {
+            com.aichallengekmp.di.AppContainer.analyticsService.logLlmCall(
+                modelId = result.modelId,
+                inputTokens = result.tokenUsage.inputTokens,
+                outputTokens = result.tokenUsage.outputTokens,
+                temperature = 0.3,
+                responseTimeMs = responseTime,
+                sessionId = null  // Compression не привязано к конкретной сессии
+            )
+        } catch (e: Exception) {
+            logger.error("Ошибка логирования LLM вызова (компрессия): ${e.message}")
+        }
+
         return result.text.trim()
     }
     

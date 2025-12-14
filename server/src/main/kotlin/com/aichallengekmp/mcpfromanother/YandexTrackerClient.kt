@@ -17,9 +17,9 @@ import kotlinx.serialization.json.Json
  */
 class YandexTrackerClient(
     // Использовать:
-    private val token: String = System.getenv("YANDEX_TRACKER_TOKEN"),
+    private val token: String = System.getenv("YANDEX_TRACKER_TOKEN") ?: "dummy_token",
     // Использовать:
-    private val orgId: String = System.getenv("YANDEX_TRACKER_ORG_ID")
+    private val orgId: String = System.getenv("YANDEX_TRACKER_ORG_ID") ?: "dummy_org_id"
 ) {
     private val baseUrl = "https://api.tracker.yandex.net/v2"
 

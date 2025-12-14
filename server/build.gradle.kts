@@ -15,8 +15,21 @@ sqldelight {
     databases {
         create("AppDatabase") {
             packageName.set("com.aichallengekmp.database")
+            srcDirs.setFrom("src/main/sqldelight")
         }
     }
+}
+
+// Добавляем сгенерированные файлы SQLDelight в sourceSets
+sourceSets {
+    named("main") {
+        java.srcDir("build/generated/sqldelight/code/AppDatabase/main")
+    }
+}
+
+// Обеспечиваем правильный порядок выполнения задач
+tasks.named("compileKotlin") {
+    dependsOn("generateMainAppDatabaseInterface")
 }
 
 application {

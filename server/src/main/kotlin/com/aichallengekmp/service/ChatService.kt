@@ -23,7 +23,9 @@ class ChatService(
     private val trackerTools: TrackerToolsService,
     private val ragSearchService: com.aichallengekmp.rag.RagSearchService,
     private val ragSourceDao: RagSourceDao,
-    private val gitTools: com.aichallengekmp.tools.GitToolsService
+    private val gitTools: com.aichallengekmp.tools.GitToolsService,
+    private val analyticsService: com.aichallengekmp.service.AnalyticsService,
+    private val analyticsTools: com.aichallengekmp.tools.AnalyticsToolsService
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
 
@@ -431,7 +433,9 @@ class ChatService(
         }
 
         // Получаем доступные инструменты из всех источников
-        val availableTools = trackerTools.getAvailableTools() + gitTools.getAvailableTools()
+        val availableTools = trackerTools.getAvailableTools() +
+                            gitTools.getAvailableTools() +
+                            analyticsTools.getAvailableTools()
         logger.info("🔧 Передаем YandexGPT ${availableTools.size} инструментов")
 
         // Строим итоговый system prompt: RAG-контекст в НАЧАЛЕ (самое важное), потом основной промпт
@@ -468,7 +472,31 @@ class ChatService(
             seed = settings.seed
         )
 
-        return modelRegistry.complete(request)
+        // Выполняем вызов LLM с замером времени
+        val startTime = System.currentTimeMillis()
+        val result = modelRegistry.complete(request)
+        val responseTime = System.currentTimeMillis() - startTime
+
+        // Логируем вызов LLM
+        try {
+            analyticsService.logLlmCall(
+                modelId = result.modelId,
+                inputTokens = result.tokenUsage.inputTokens,
+                outputTokens = result.tokenUsage.outputTokens,
+                temperature = settings.temperature,
+                responseTimeMs = responseTime,
+                sessionId = sessionId,
+                topP = settings.topP,
+                topK = settings.topK,
+                numCtx = settings.numCtx,
+                repeatPenalty = settings.repeatPenalty,
+                seed = settings.seed
+            )
+        } catch (e: Exception) {
+            logger.error("Ошибка логирования LLM вызова: ${e.message}")
+        }
+
+        return result
     }
     
     /**
@@ -498,9 +526,25 @@ class ChatService(
                 temperature = 0.7,
                 maxTokens = 50
             )
-            
+
+            val startTime = System.currentTimeMillis()
             val result = modelRegistry.complete(request)
+            val responseTime = System.currentTimeMillis() - startTime
             val generatedName = result.text.trim().take(50)
+
+            // Логируем вызов LLM
+            try {
+                analyticsService.logLlmCall(
+                    modelId = result.modelId,
+                    inputTokens = result.tokenUsage.inputTokens,
+                    outputTokens = result.tokenUsage.outputTokens,
+                    temperature = 0.7,
+                    responseTimeMs = responseTime,
+                    sessionId = sessionId
+                )
+            } catch (e: Exception) {
+                logger.error("Ошибка логирования LLM вызова (генерация названия): ${e.message}")
+            }
             
             sessionDao.updateName(sessionId, generatedName, System.currentTimeMillis())
             
@@ -689,7 +733,23 @@ class ChatService(
             tools = null  // Для /help не используем tools
         )
 
+        val startTime = System.currentTimeMillis()
         val aiResponse = modelRegistry.complete(request)
+        val responseTime = System.currentTimeMillis() - startTime
+
+        // Логируем вызов LLM
+        try {
+            analyticsService.logLlmCall(
+                modelId = aiResponse.modelId,
+                inputTokens = aiResponse.tokenUsage.inputTokens,
+                outputTokens = aiResponse.tokenUsage.outputTokens,
+                temperature = settings.temperature,
+                responseTimeMs = responseTime,
+                sessionId = sessionId
+            )
+        } catch (e: Exception) {
+            logger.error("Ошибка логирования LLM вызова (/help): ${e.message}")
+        }
 
         // Сохраняем ответ ассистента
         val assistantMessage = Message(

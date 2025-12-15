@@ -46,41 +46,50 @@ class ChatViewModel(
     }
     
     /**
-     * Загрузить начальные данные (сессии + модели)
+     * Загрузить начальные данные (сессии + модели + профили)
      */
     fun loadInitialData() {
         viewModelScope.launch {
             logger.info("📥 Загрузка начальных данных")
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
+
             try {
                 // Загружаем сессии
                 val sessionsResult = repository.getSessions()
-                val sessions = sessionsResult.getOrElse { 
+                val sessions = sessionsResult.getOrElse {
                     logger.error("❌ Ошибка загрузки сессий: ${it.message}")
                     emptyList()
                 }
-                
+
                 // Загружаем доступные модели
                 val modelsResult = repository.getAvailableModels()
-                val models = modelsResult.getOrElse { 
+                val models = modelsResult.getOrElse {
                     logger.error("❌ Ошибка загрузки моделей: ${it.message}")
                     emptyList()
                 }
-                
-                _uiState.update { 
+
+                // Загружаем профили пользователя
+                val profilesResult = repository.getAvailableProfiles()
+                val profilesData = profilesResult.getOrNull()
+                val profiles = profilesData?.profiles ?: emptyList()
+                val currentProfileId = profilesData?.currentProfileId ?: "default"
+                val currentProfile = profiles.firstOrNull { it.id == currentProfileId }
+
+                _uiState.update {
                     it.copy(
                         sessions = sessions,
                         availableModels = models,
+                        availableProfiles = profiles,
+                        currentProfile = currentProfile,
                         isLoading = false,
                         sessionCounter = sessions.size + 1
                     )
                 }
-                
-                logger.info("✅ Данные загружены: ${sessions.size} сессий, ${models.size} моделей")
+
+                logger.info("✅ Данные загружены: ${sessions.size} сессий, ${models.size} моделей, ${profiles.size} профилей")
             } catch (e: Exception) {
                 logger.error("❌ Критическая ошибка при загрузке данных: ${e.message}", e)
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isLoading = false,
                         error = ErrorState(

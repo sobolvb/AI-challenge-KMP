@@ -28,6 +28,8 @@ fun ChatPanel(
     pendingMessage: String,
     defaultSettings: SessionSettingsDto,
     availableModels: List<ModelInfoDto>,
+    availableProfiles: List<com.aichallengekmp.model.UserProfile>,
+    currentProfile: com.aichallengekmp.model.UserProfile?,
     showDefaultSettings: Boolean,
     isSending: Boolean,
     error: ErrorState?,
@@ -74,6 +76,8 @@ fun ChatPanel(
                 pendingMessage = pendingMessage,
                 defaultSettings = defaultSettings,
                 availableModels = availableModels,
+                availableProfiles = availableProfiles,
+                currentProfile = currentProfile,
                 showSettings = showDefaultSettings,
                 isSending = isSending,
                 error = error,
@@ -192,6 +196,8 @@ private fun EmptyState(
     pendingMessage: String,
     defaultSettings: SessionSettingsDto,
     availableModels: List<ModelInfoDto>,
+    availableProfiles: List<com.aichallengekmp.model.UserProfile>,
+    currentProfile: com.aichallengekmp.model.UserProfile?,
     showSettings: Boolean,
     isSending: Boolean,
     error: ErrorState?,
@@ -285,6 +291,8 @@ private fun EmptyState(
                     DefaultSettingsPanel(
                         settings = defaultSettings,
                         availableModels = availableModels,
+                        availableProfiles = availableProfiles,
+                        currentProfile = currentProfile,
                         onSettingsChange = onSettingsChange
                     )
                 }

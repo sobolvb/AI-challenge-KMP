@@ -76,6 +76,7 @@ data class SessionSettingsDto(
     val maxTokens: Int = 2000,
     val compressionThreshold: Int = 20,
     val systemPrompt: String? = "выполни задачу",
+    val selectedProfileId: String = "default",  // ID выбранного профиля пользователя
     // Advanced LLM parameters
     val topP: Double? = null,           // Nucleus sampling (0.0 - 1.0)
     val topK: Int? = null,              // Top-K sampling (1 - 100)

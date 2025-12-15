@@ -19,11 +19,13 @@ import com.aichallengekmp.models.SessionSettingsDto
 fun SessionSettingsDialog(
     session: SessionDetailResponse,
     availableModels: List<ModelInfoDto>,
+    availableProfiles: List<com.aichallengekmp.model.UserProfile>,
+    currentProfile: com.aichallengekmp.model.UserProfile?,
     onDismiss: () -> Unit,
     onSave: (SessionSettingsDto) -> Unit
 ) {
     var settings by remember { mutableStateOf(session.settings) }
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -40,9 +42,9 @@ fun SessionSettingsDialog(
                     text = "Настройки чата",
                     style = MaterialTheme.typography.headlineSmall
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Настройки
                 Column(
                     modifier = Modifier
@@ -52,6 +54,8 @@ fun SessionSettingsDialog(
                     DefaultSettingsPanel(
                         settings = settings,
                         availableModels = availableModels,
+                        availableProfiles = availableProfiles,
+                        currentProfile = currentProfile,
                         onSettingsChange = { settings = it }
                     )
                 }

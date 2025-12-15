@@ -44,6 +44,8 @@ fun ChatScreen(
                 pendingMessage = uiState.pendingMessage,
                 defaultSettings = uiState.defaultSettings,
                 availableModels = uiState.availableModels,
+                availableProfiles = uiState.availableProfiles,
+                currentProfile = uiState.currentProfile,
                 showDefaultSettings = uiState.showDefaultSettingsPanel,
                 isSending = uiState.isSending,
                 error = uiState.error,
@@ -71,6 +73,8 @@ fun ChatScreen(
             SessionSettingsDialog(
                 session = uiState.selectedSession!!,
                 availableModels = uiState.availableModels,
+                availableProfiles = uiState.availableProfiles,
+                currentProfile = uiState.currentProfile,
                 onDismiss = { viewModel.toggleSettingsDialog(false) },
                 onSave = { settings ->
                     viewModel.updateSessionSettings(uiState.selectedSession!!.id, settings)

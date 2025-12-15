@@ -24,14 +24,32 @@ import com.aichallengekmp.models.SessionSettingsDto
 fun DefaultSettingsPanel(
     settings: SessionSettingsDto,
     availableModels: List<ModelInfoDto>,
+    availableProfiles: List<com.aichallengekmp.model.UserProfile>,
+    currentProfile: com.aichallengekmp.model.UserProfile?,
     onSettingsChange: (SessionSettingsDto) -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Выбор профиля пользователя
+        // DEBUG: Показываем количество профилей
+        Text(
+            text = "DEBUG: Загружено профилей: ${availableProfiles.size}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+
+        ProfileSelector(
+            currentProfile = availableProfiles.firstOrNull { it.id == settings.selectedProfileId } ?: currentProfile,
+            availableProfiles = availableProfiles,
+            onProfileSelected = { profileId ->
+                onSettingsChange(settings.copy(selectedProfileId = profileId))
+            }
+        )
+
+        HorizontalDivider()
+
         // Выбор модели
         ModelSelector(
             selectedModelId = settings.modelId,

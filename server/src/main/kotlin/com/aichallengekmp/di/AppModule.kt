@@ -7,6 +7,8 @@ import com.aichallengekmp.database.DatabaseFactory
 import com.aichallengekmp.database.dao.*
 import com.aichallengekmp.database.dao.RagChunkDao
 import com.aichallengekmp.mcp.McpClientRegistry
+import com.aichallengekmp.profile.ProfileManager
+import com.aichallengekmp.model.UserProfile
 import com.aichallengekmp.mcp.McpServerClient
 import com.aichallengekmp.mcp.McpServerConfig
 import com.aichallengekmp.rag.OllamaEmbeddingsProvider
@@ -49,10 +51,30 @@ object AppContainer {
 //            mcpTrackerUrl = "http://localhost:8080/mcp/tracker",
 //            mcpRemindersUrl = "http://localhost:8080/mcp/reminders"
             mcpTrackerUrl = "http://localhost:8080/mcp",
-            mcpRemindersUrl = "http://localhost:8080/mcp"
+            mcpRemindersUrl = "http://localhost:8080/mcp",
+            selectedProfileId = System.getenv("USER_PROFILE") ?: "default"
         )
     }
-    
+
+    // ============= Profile Management =============
+
+    val profileManager by lazy {
+        logger.info("👤 Инициализация ProfileManager")
+        ProfileManager()
+    }
+
+    val availableProfiles by lazy {
+        logger.info("👥 Загрузка доступных профилей")
+        profileManager.loadAllProfiles()
+    }
+
+    val currentProfile by lazy {
+        logger.info("👤 Загрузка текущего профиля: ${config.selectedProfileId}")
+        profileManager.loadProfile(config.selectedProfileId)
+            ?: profileManager.loadProfile("default")
+            ?: error("Не удалось загрузить профиль по умолчанию")
+    }
+
     // ============= HTTP Client =============
 
     val httpClient by lazy {
@@ -242,7 +264,8 @@ object AppContainer {
             ragSourceDao = ragSourceDao,
             gitTools = gitTools,
             analyticsService = analyticsService,
-            analyticsTools = analyticsTools
+            analyticsTools = analyticsTools,
+            profileManager = profileManager
         )
     }
 }
@@ -256,5 +279,6 @@ data class AppConfig(
     val yandexFolderId: String,
     val dbPath: String,
     val mcpTrackerUrl: String,
-    val mcpRemindersUrl: String
+    val mcpRemindersUrl: String,
+    val selectedProfileId: String = "default"
 )

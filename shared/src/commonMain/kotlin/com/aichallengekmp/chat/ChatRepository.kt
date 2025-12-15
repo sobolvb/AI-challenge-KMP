@@ -1,6 +1,7 @@
 package com.aichallengekmp.chat
 
 import com.aichallengekmp.models.*
+import com.aichallengekmp.model.UserProfile
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.timeout
@@ -24,12 +25,22 @@ interface ChatRepository {
     // RAG эксперимент: сравнение ответов с/без документации
     suspend fun askRag(request: RagAskRequest): Result<RagAskResponse>
 
+    // Профили пользователей
+    suspend fun getAvailableProfiles(): Result<ProfilesResponse>
+    suspend fun getCurrentProfile(): Result<UserProfile>
+
     /**
      * Подписка на SSE-стрим напоминаний.
      * Блокирующий вызов: пока соединение открыто, onSummary вызывается при каждом событии.
      */
     suspend fun listenReminders(onSummary: (String) -> Unit)
 }
+
+@kotlinx.serialization.Serializable
+data class ProfilesResponse(
+    val profiles: List<UserProfile>,
+    val currentProfileId: String
+)
 
 /**
  * Реализация репозитория через Ktor HTTP Client
@@ -88,6 +99,18 @@ class KtorChatRepository(
         client.post("$baseUrl/api/rag/ask") {
             contentType(ContentType.Application.Json)
             setBody(request)
+        }.body()
+    }
+
+    override suspend fun getAvailableProfiles(): Result<ProfilesResponse> = runCatching {
+        client.get("$baseUrl/api/profiles") {
+            accept(ContentType.Application.Json)
+        }.body()
+    }
+
+    override suspend fun getCurrentProfile(): Result<UserProfile> = runCatching {
+        client.get("$baseUrl/api/profiles/current") {
+            accept(ContentType.Application.Json)
         }.body()
     }
 

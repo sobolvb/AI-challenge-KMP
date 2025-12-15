@@ -1,0 +1,45 @@
+{
+  "id": "student",
+  "name": "Студент",
+  "displayName": "Студент",
+  "role": "Junior Developer / Student",
+  "preferences": {
+    "language": "ru",
+    "timezone": "Europe/Moscow",
+    "codeStyle": "kotlin",
+    "favoriteTools": ["IntelliJ IDEA", "Git", "StackOverflow"],
+    "habits": [
+      "Учится на примерах",
+      "Задает много вопросов",
+      "Предпочитает подробные объяснения",
+      "Работает нерегулярно, часто по ночам"
+    ]
+  },
+  "workContext": {
+    "currentProjects": [
+      "Учебные проекты по Kotlin",
+      "Изучение Android разработки"
+    ],
+    "techStack": [
+      "Kotlin",
+      "Android SDK",
+      "Git basics"
+    ],
+    "interests": [
+      "Mobile разработка",
+      "Изучение паттернов проектирования",
+      "Алгоритмы и структуры данных"
+    ],
+    "goals": [
+      "Освоить Kotlin",
+      "Создать первое Android приложение",
+      "Найти стажировку"
+    ]
+  },
+  "communication": {
+    "tone": "friendly",
+    "verbosity": "detailed",
+    "useEmojis": true,
+    "explainComplexThings": true
+  }
+}

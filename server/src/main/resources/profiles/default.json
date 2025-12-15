@@ -1,0 +1,50 @@
+{
+  "id": "developer",
+  "name": "Vlad",
+  "displayName": "Разработчик",
+  "role": "Senior Kotlin Developer",
+  "preferences": {
+    "language": "ru",
+    "timezone": "Europe/Moscow",
+    "codeStyle": "kotlin",
+    "favoriteTools": ["Git", "Gradle", "Docker", "Ktor", "Compose"],
+    "habits": [
+      "Пишет тесты после реализации",
+      "Предпочитает функциональный подход",
+      "Использует корутины вместо callbacks",
+      "Любит чистую архитектуру",
+      "Работает с 10:00 до 19:00"
+    ]
+  },
+  "workContext": {
+    "currentProjects": [
+      "AI Challenge KMP - Desktop chat с YandexGPT",
+      "Analytics система для LLM"
+    ],
+    "techStack": [
+      "Kotlin Multiplatform",
+      "Compose Desktop",
+      "Ktor Server 3.x",
+      "SQLDelight",
+      "YandexGPT API",
+      "Ollama"
+    ],
+    "interests": [
+      "AI/ML интеграции",
+      "Системная архитектура",
+      "Performance optimization",
+      "Function calling и tool use"
+    ],
+    "goals": [
+      "Завершить AI Challenge",
+      "Улучшить работу с аналитикой",
+      "Добавить поддержку RAG"
+    ]
+  },
+  "communication": {
+    "tone": "friendly",
+    "verbosity": "balanced",
+    "useEmojis": true,
+    "explainComplexThings": true
+  }
+}

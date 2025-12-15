@@ -3,6 +3,7 @@ package com.aichallengekmp
 import com.aichallengekmp.di.AppContainer
 import com.aichallengekmp.routing.chatRoutes
 import com.aichallengekmp.routing.ragRoutes
+import com.aichallengekmp.routes.profileRoutes
 import com.aichallengekmp.mcp.configureMcpServer
 import com.aichallengekmp.mcp.configureTrackerMcpServer
 import com.aichallengekmp.mcp.configureRemindersMcpServer
@@ -149,6 +150,7 @@ fun Application.module() {
         route("/api") {
             chatRoutes()
             ragRoutes()
+            profileRoutes()
 
             // SSE-стрим с напоминаниями для клиента KMP (Ktor 3.x API)
             sse("/reminders/stream") {

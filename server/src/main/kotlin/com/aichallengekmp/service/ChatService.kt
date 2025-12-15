@@ -6,6 +6,7 @@ import com.aichallengekmp.database.Session
 import com.aichallengekmp.database.SessionSettings
 import com.aichallengekmp.database.dao.*
 import com.aichallengekmp.models.*
+import com.aichallengekmp.model.UserProfile
 import com.aichallengekmp.tools.TrackerToolsService
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -25,7 +26,8 @@ class ChatService(
     private val ragSourceDao: RagSourceDao,
     private val gitTools: com.aichallengekmp.tools.GitToolsService,
     private val analyticsService: com.aichallengekmp.service.AnalyticsService,
-    private val analyticsTools: com.aichallengekmp.tools.AnalyticsToolsService
+    private val analyticsTools: com.aichallengekmp.tools.AnalyticsToolsService,
+    private val profileManager: com.aichallengekmp.profile.ProfileManager
 ) {
     private val logger = LoggerFactory.getLogger(ChatService::class.java)
 
@@ -447,6 +449,61 @@ class ChatService(
                 logger.info("📖 RAG-контекст добавлен В НАЧАЛО системного промпта (${ragContext.length} символов)")
             } else {
                 logger.warn("⚠️ RAG-контекст пустой, ничего не добавлено в промпт")
+            }
+
+            // Добавляем информацию о профиле пользователя
+            // Загружаем профиль по ID из настроек сессии
+            val userProfile = profileManager.loadProfile(settings.selectedProfileId)
+            if (userProfile != null) {
+                append("=== ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ ===\n")
+                append("Имя: ${userProfile.name}")
+                userProfile.role?.let { append(" (${it})") }
+                append("\n\n")
+
+                // Рабочий контекст
+                if (userProfile.workContext.currentProjects.isNotEmpty()) {
+                    append("Текущие проекты:\n")
+                    userProfile.workContext.currentProjects.forEach { project ->
+                        append("- $project\n")
+                    }
+                    append("\n")
+                }
+
+                if (userProfile.workContext.techStack.isNotEmpty()) {
+                    append("Стек технологий: ${userProfile.workContext.techStack.joinToString(", ")}\n")
+                }
+
+                if (userProfile.workContext.interests.isNotEmpty()) {
+                    append("Интересы: ${userProfile.workContext.interests.joinToString(", ")}\n")
+                }
+
+                if (userProfile.workContext.goals.isNotEmpty()) {
+                    append("\nЦели:\n")
+                    userProfile.workContext.goals.forEach { goal ->
+                        append("- $goal\n")
+                    }
+                }
+
+                // Привычки и предпочтения
+                if (userProfile.preferences.habits.isNotEmpty()) {
+                    append("\nПривычки и предпочтения:\n")
+                    userProfile.preferences.habits.forEach { habit ->
+                        append("- $habit\n")
+                    }
+                }
+
+                // Стиль коммуникации
+                append("\nСтиль общения: ")
+                append("тон - ${userProfile.communication.tone}, ")
+                append("детализация - ${userProfile.communication.verbosity}")
+                if (userProfile.communication.useEmojis) {
+                    append(", использовать эмодзи")
+                }
+                if (userProfile.communication.explainComplexThings) {
+                    append(", объяснять сложные концепции")
+                }
+                append("\n")
+                append("=== КОНЕЦ ПРОФИЛЯ ===\n\n")
             }
 
             append(defaultAgentSystemPrompt)

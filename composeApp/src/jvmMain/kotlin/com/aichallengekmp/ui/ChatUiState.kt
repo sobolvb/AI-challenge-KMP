@@ -29,6 +29,7 @@ data class ChatUiState(
     // Состояния UI
     val isLoading: Boolean = false,
     val isSending: Boolean = false,
+    val isRecordingVoice: Boolean = false,
     val error: ErrorState? = null,
 
     // Диалоги

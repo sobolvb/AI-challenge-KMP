@@ -1,8 +1,17 @@
 package com.aichallengekmp.di
 
 import androidx.core.bundle.Bundle
+import com.aichallengekmp.audio.AudioRecorder
 import com.aichallengekmp.chat.ChatClientProvider
+import com.aichallengekmp.speech.KtorSpeechRepository
+import com.aichallengekmp.speech.SpeechRepository
 import com.aichallengekmp.ui.ChatViewModel
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -11,11 +20,37 @@ import org.koin.dsl.module
  */
 val appModule = module {
 
+    // HTTP Client for Speech (with long timeout for Whisper processing)
+    single {
+        HttpClient(CIO) {
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                })
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 60000 // 60 секунд для обработки аудио
+                connectTimeoutMillis = 10000
+                socketTimeoutMillis = 60000
+            }
+        }
+    }
+
     // Repository
     single { ChatClientProvider.repository }
+    single<SpeechRepository> {
+        KtorSpeechRepository(
+            client = get(),
+            baseUrl = "http://localhost:8080"
+        )
+    }
+
+    // Services
+    single { AudioRecorder() }
 
     // ViewModel
-    viewModel { ChatViewModel(get()) }
+    viewModel { ChatViewModel(get(), get(), get()) }
 }
 
     /*

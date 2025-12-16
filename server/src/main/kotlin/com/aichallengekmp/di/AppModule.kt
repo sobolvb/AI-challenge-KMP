@@ -144,6 +144,11 @@ object AppContainer {
         com.aichallengekmp.service.AnalyticsService(analyticsEventDao)
     }
 
+    val whisperService by lazy {
+        logger.info("🎤 Инициализация WhisperService")
+        com.aichallengekmp.speech.WhisperService()
+    }
+
     /**
      * Локальная реализация инструментов (без MCP) — используется как
      * fallback и для MCP-серверов.

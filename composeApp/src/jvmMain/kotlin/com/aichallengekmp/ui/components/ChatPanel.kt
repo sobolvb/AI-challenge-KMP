@@ -32,6 +32,7 @@ fun ChatPanel(
     currentProfile: com.aichallengekmp.model.UserProfile?,
     showDefaultSettings: Boolean,
     isSending: Boolean,
+    isRecordingVoice: Boolean,
     error: ErrorState?,
     onMessageChange: (String) -> Unit,
     onSendClick: () -> Unit,
@@ -45,6 +46,8 @@ fun ChatPanel(
     ragSimilarityThreshold: Double,
     onToggleRagCompare: (Boolean) -> Unit,
     onChangeRagThreshold: (Double) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -58,6 +61,7 @@ fun ChatPanel(
                 session = session,
                 pendingMessage = pendingMessage,
                 isSending = isSending,
+                isRecordingVoice = isRecordingVoice,
                 error = error,
                 onMessageChange = onMessageChange,
                 onSendClick = onSendClick,
@@ -68,7 +72,9 @@ fun ChatPanel(
                 ragResult = ragResult,
                 ragSimilarityThreshold = ragSimilarityThreshold,
                 onToggleRagCompare = onToggleRagCompare,
-                onChangeRagThreshold = onChangeRagThreshold
+                onChangeRagThreshold = onChangeRagThreshold,
+                onStartRecording = onStartRecording,
+                onStopRecording = onStopRecording
             )
         } else {
             // Нет выбранной сессии - показываем placeholder
@@ -80,6 +86,7 @@ fun ChatPanel(
                 currentProfile = currentProfile,
                 showSettings = showDefaultSettings,
                 isSending = isSending,
+                isRecordingVoice = isRecordingVoice,
                 error = error,
                 onMessageChange = onMessageChange,
                 onSendClick = onSendClick,
@@ -91,7 +98,9 @@ fun ChatPanel(
                 ragResult = ragResult,
                 ragSimilarityThreshold = ragSimilarityThreshold,
                 onToggleRagCompare = onToggleRagCompare,
-                onChangeRagThreshold = onChangeRagThreshold
+                onChangeRagThreshold = onChangeRagThreshold,
+                onStartRecording = onStartRecording,
+                onStopRecording = onStopRecording
             )
         }
     }
@@ -105,6 +114,7 @@ private fun ChatContent(
     session: SessionDetailResponse,
     pendingMessage: String,
     isSending: Boolean,
+    isRecordingVoice: Boolean,
     error: ErrorState?,
     onMessageChange: (String) -> Unit,
     onSendClick: () -> Unit,
@@ -115,7 +125,9 @@ private fun ChatContent(
     ragResult: RagAskResponse?,
     ragSimilarityThreshold: Double,
     onToggleRagCompare: (Boolean) -> Unit,
-    onChangeRagThreshold: (Double) -> Unit
+    onChangeRagThreshold: (Double) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Заголовок с названием сессии и кнопкой настроек
@@ -176,6 +188,7 @@ private fun ChatContent(
         MessageInput(
             message = pendingMessage,
             isSending = isSending,
+            isRecordingVoice = isRecordingVoice,
             ragCompareEnabled = ragCompareEnabled,
             ragResult = ragResult,
             similarityThreshold = ragSimilarityThreshold,
@@ -183,7 +196,9 @@ private fun ChatContent(
             onSendClick = onSendClick,
             onCancelClick = onCancelClick,
             onToggleRagCompare = onToggleRagCompare,
-            onChangeThreshold = onChangeRagThreshold
+            onChangeThreshold = onChangeRagThreshold,
+            onStartRecording = onStartRecording,
+            onStopRecording = onStopRecording
         )
     }
 }
@@ -200,6 +215,7 @@ private fun EmptyState(
     currentProfile: com.aichallengekmp.model.UserProfile?,
     showSettings: Boolean,
     isSending: Boolean,
+    isRecordingVoice: Boolean,
     error: ErrorState?,
     onMessageChange: (String) -> Unit,
     onSendClick: () -> Unit,
@@ -211,7 +227,9 @@ private fun EmptyState(
     ragResult: RagAskResponse?,
     ragSimilarityThreshold: Double,
     onToggleRagCompare: (Boolean) -> Unit,
-    onChangeRagThreshold: (Double) -> Unit
+    onChangeRagThreshold: (Double) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -305,6 +323,7 @@ private fun EmptyState(
         MessageInput(
             message = pendingMessage,
             isSending = isSending,
+            isRecordingVoice = isRecordingVoice,
             ragCompareEnabled = ragCompareEnabled,
             ragResult = ragResult,
             similarityThreshold = ragSimilarityThreshold,
@@ -312,7 +331,9 @@ private fun EmptyState(
             onSendClick = onSendClick,
             onCancelClick = onCancelClick,
             onToggleRagCompare = onToggleRagCompare,
-            onChangeThreshold = onChangeRagThreshold
+            onChangeThreshold = onChangeRagThreshold,
+            onStartRecording = onStartRecording,
+            onStopRecording = onStopRecording
         )
     }
 }
@@ -355,6 +376,7 @@ private fun MessageList(
 private fun MessageInput(
     message: String,
     isSending: Boolean,
+    isRecordingVoice: Boolean,
     ragCompareEnabled: Boolean,
     ragResult: RagAskResponse?,
     similarityThreshold: Double,
@@ -362,7 +384,9 @@ private fun MessageInput(
     onSendClick: () -> Unit,
     onCancelClick: () -> Unit,
     onToggleRagCompare: (Boolean) -> Unit,
-    onChangeThreshold: (Double) -> Unit
+    onChangeThreshold: (Double) -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit
 ) {
     Column(
         Modifier.verticalScroll(rememberScrollState())
@@ -432,6 +456,34 @@ private fun MessageInput(
                         Text("Прервать")
                     }
                 } else {
+                    // Кнопка записи голоса
+                    IconButton(
+                        onClick = {
+                            if (isRecordingVoice) {
+                                onStopRecording()
+                            } else {
+                                onStartRecording()
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isRecordingVoice)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isRecordingVoice) Icons.Default.Stop else Icons.Default.Mic,
+                            contentDescription = if (isRecordingVoice) "Остановить запись" else "Начать запись",
+                            tint = if (isRecordingVoice)
+                                MaterialTheme.colorScheme.onError
+                            else
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     Button(
                         onClick = onSendClick,
                         enabled = message.trim().isNotEmpty()

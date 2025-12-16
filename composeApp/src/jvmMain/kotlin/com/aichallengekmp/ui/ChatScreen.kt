@@ -48,6 +48,7 @@ fun ChatScreen(
                 currentProfile = uiState.currentProfile,
                 showDefaultSettings = uiState.showDefaultSettingsPanel,
                 isSending = uiState.isSending,
+                isRecordingVoice = uiState.isRecordingVoice,
                 error = uiState.error,
                 onMessageChange = viewModel::updatePendingMessage,
                 onSendClick = viewModel::sendMessage,
@@ -64,6 +65,8 @@ fun ChatScreen(
                 ragSimilarityThreshold = uiState.ragSimilarityThreshold,
                 onToggleRagCompare = viewModel::toggleRagCompare,
                 onChangeRagThreshold = viewModel::updateRagThreshold,
+                onStartRecording = viewModel::startVoiceRecording,
+                onStopRecording = viewModel::stopVoiceRecording,
                 modifier = Modifier.weight(1f)
             )
         }

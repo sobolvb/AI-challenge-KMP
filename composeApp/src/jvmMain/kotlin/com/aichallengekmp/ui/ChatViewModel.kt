@@ -15,7 +15,9 @@ import org.slf4j.LoggerFactory
  * Следует принципу Single Source of Truth - все состояние в одном месте
  */
 class ChatViewModel(
-    private val repository: ChatRepository
+    private val repository: ChatRepository,
+    private val speechRepository: com.aichallengekmp.speech.SpeechRepository,
+    private val audioRecorder: com.aichallengekmp.audio.AudioRecorder
 ) : ViewModel() {
     
     private val logger = LoggerFactory.getLogger(ChatViewModel::class.java)
@@ -465,7 +467,7 @@ class ChatViewModel(
             }
             .onFailure { error ->
                 logger.error("❌ Ошибка отправки сообщения: ${error.message}", error)
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isSending = false,
                         error = ErrorState(
@@ -475,5 +477,115 @@ class ChatViewModel(
                     )
                 }
             }
+    }
+
+    // ============= Voice Recording =============
+
+    /**
+     * Начать запись голоса
+     */
+    fun startVoiceRecording() {
+        viewModelScope.launch {
+            try {
+                logger.info("🎤 Начинаем запись голоса")
+                _uiState.update { it.copy(isRecordingVoice = true) }
+                audioRecorder.startRecording()
+            } catch (e: Exception) {
+                logger.error("❌ Ошибка при начале записи: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isRecordingVoice = false,
+                        error = ErrorState(
+                            message = "Не удалось начать запись",
+                            details = e.message
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Остановить запись и распознать речь
+     */
+    fun stopVoiceRecording() {
+        viewModelScope.launch {
+            try {
+                logger.info("🛑 Останавливаем запись")
+
+                val audioFile = audioRecorder.stopRecording()
+                _uiState.update { it.copy(isRecordingVoice = false) }
+
+                if (audioFile == null) {
+                    logger.warn("⚠️ Нет записанных данных")
+                    _uiState.update {
+                        it.copy(
+                            error = ErrorState(message = "Не удалось записать аудио")
+                        )
+                    }
+                    return@launch
+                }
+
+                logger.info("📤 Отправляем аудио на распознавание")
+                _uiState.update { it.copy(isSending = true) }
+
+                val audioData = audioFile.readBytes()
+                val result = speechRepository.transcribeAudio(audioData, "ru")
+
+                result.onSuccess { transcription ->
+                    if (transcription.error != null) {
+                        logger.error("❌ Ошибка распознавания: ${transcription.error}")
+                        _uiState.update {
+                            it.copy(
+                                isSending = false,
+                                error = ErrorState(
+                                    message = "Ошибка распознавания речи",
+                                    details = transcription.error
+                                )
+                            )
+                        }
+                    } else {
+                        logger.info("✅ Распознано: \"${transcription.text}\"")
+
+                        // Устанавливаем распознанный текст в поле ввода
+                        _uiState.update {
+                            it.copy(
+                                pendingMessage = transcription.text,
+                                isSending = false
+                            )
+                        }
+
+                        // Автоматически отправляем в чат
+                        if (transcription.text.isNotBlank()) {
+                            sendMessage()
+                        }
+                    }
+                }.onFailure { error ->
+                    logger.error("❌ Ошибка отправки аудио: ${error.message}", error)
+                    _uiState.update {
+                        it.copy(
+                            isSending = false,
+                            error = ErrorState(
+                                message = "Не удалось распознать речь",
+                                details = error.message
+                            )
+                        )
+                    }
+                }
+
+            } catch (e: Exception) {
+                logger.error("❌ Ошибка при остановке записи: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isRecordingVoice = false,
+                        isSending = false,
+                        error = ErrorState(
+                            message = "Ошибка обработки голоса",
+                            details = e.message
+                        )
+                    )
+                }
+            }
+        }
     }
 }

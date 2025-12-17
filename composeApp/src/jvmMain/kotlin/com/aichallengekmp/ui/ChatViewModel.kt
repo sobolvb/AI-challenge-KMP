@@ -111,11 +111,11 @@ class ChatViewModel(
         viewModelScope.launch {
             logger.info("📂 Выбор сессии: $sessionId")
             _uiState.update { it.copy(isLoading = true, error = null) }
-            
+
             repository.getSessionDetail(sessionId)
                 .onSuccess { session ->
                     logger.info("✅ Сессия загружена: ${session.messages.size} сообщений")
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             selectedSession = session,
                             isLoading = false
@@ -124,7 +124,7 @@ class ChatViewModel(
                 }
                 .onFailure { error ->
                     logger.error("❌ Ошибка загрузки сессии: ${error.message}", error)
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             isLoading = false,
                             error = ErrorState(
@@ -134,6 +134,20 @@ class ChatViewModel(
                         )
                     }
                 }
+        }
+    }
+
+    /**
+     * Начать новый чат (отменить выбор сессии)
+     */
+    fun startNewChat() {
+        logger.info("✨ Начало нового чата")
+        _uiState.update {
+            it.copy(
+                selectedSession = null,
+                pendingMessage = "",
+                error = null
+            )
         }
     }
     
@@ -283,12 +297,26 @@ class ChatViewModel(
     fun toggleSettingsDialog(show: Boolean) {
         _uiState.update { it.copy(showSettingsDialog = show) }
     }
-    
+
     /**
      * Показать/скрыть панель настроек по умолчанию
      */
     fun toggleDefaultSettingsPanel(show: Boolean) {
         _uiState.update { it.copy(showDefaultSettingsPanel = show) }
+    }
+
+    /**
+     * Показать/скрыть выдвижную панель сессий
+     */
+    fun toggleSessionsDrawer(show: Boolean) {
+        _uiState.update { it.copy(showSessionsDrawer = show) }
+    }
+
+    /**
+     * Показать/скрыть выдвижную панель настроек
+     */
+    fun toggleSettingsDrawer(show: Boolean) {
+        _uiState.update { it.copy(showSettingsDrawer = show) }
     }
     
     /**

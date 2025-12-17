@@ -19,6 +19,7 @@ import com.aichallengekmp.di.appModule
 import com.aichallengekmp.offline.OfflineChatScreen
 import com.aichallengekmp.theme.ChatTheme
 import com.aichallengekmp.ui.ChatScreen
+import com.aichallengekmp.ui.ModernChatScreen
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
@@ -66,7 +67,7 @@ fun main() {
                 when {
                     isChecking -> LoadingScreen()
                     offlineMode -> OfflineChatScreen()
-                    else -> ChatScreen()
+                    else -> ModernChatScreen()  // Новый современный UI
                 }
             }
         }

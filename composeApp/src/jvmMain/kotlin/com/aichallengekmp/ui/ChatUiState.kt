@@ -37,6 +37,10 @@ data class ChatUiState(
     val showDefaultSettingsPanel: Boolean = false,
     val showDeleteConfirmation: String? = null, // sessionId для подтверждения удаления
 
+    // Выдвижные панели (новый UI)
+    val showSessionsDrawer: Boolean = false,
+    val showSettingsDrawer: Boolean = false,
+
     // Счетчик для генерации названий новых чатов
     val sessionCounter: Int = 1,
 
